@@ -17,17 +17,21 @@
 <script>document.documentElement.className = "js";</script>
 <style>
   :root {
-    --page: #08090b;
-    --bg: #0f1114;
-    --bar: #16191e;
-    --fg: #c8ccd2;
-    --bright: #eceff3;
-    --dim: #6c727d;
-    --faint: #2a2e35;
-    --accent: #9ece8a;
-    --accent-2: #e2c08d;
-    --blue: #8fb4d8;
-    --red: #e08a8a;
+    --page: #111219;
+    --bg: #1a1b26;
+    --bar: #16161e;
+    --fg: #a9b1d6;
+    --bright: #c0caf5;
+    --dim: #565f89;
+    --faint: #3b4261;
+    --accent: #7aa2f7;
+    --accent-2: #e0af68;
+    --blue: #7dcfff;
+    --red: #f7768e;
+    --green: #9ece6a;
+    --magenta: #bb9af7;
+    --orange: #ff9e64;
+    --teal: #2ac3de;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -63,21 +67,27 @@
     height: min(880px, calc(100dvh - 48px));
     display: flex; flex-direction: column;
     background: var(--bg);
-    border: 1px solid #22262c;
+    border: 1px solid #292e42;
     border-radius: 10px;
     box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.02) inset;
     overflow: hidden;
   }
+  /* reading a post: the terminal grows to the full height of the page */
+  body { transition: padding .4s cubic-bezier(.2,.7,.2,1); }
+  .term { transition: height .4s cubic-bezier(.2,.7,.2,1), border-radius .4s; }
+  body.reading { padding-top: 0; padding-bottom: 0; }
+  body.reading .term { height: 100vh; height: 100dvh; border-radius: 0; border-top-color: transparent; border-bottom-color: transparent; }
+
   .titlebar {
     flex: none; height: 34px;
     display: flex; align-items: center; gap: 8px;
     padding: 0 14px;
-    background: #121418;
-    border-bottom: 1px solid #1d2026;
+    background: #16161e;
+    border-bottom: 1px solid #232433;
     color: var(--dim); font-size: 12.5px;
   }
   .dots { display: flex; gap: 7px; }
-  .dots i { width: 11px; height: 11px; border-radius: 50%; background: #2c3037; display: block; }
+  .dots i { width: 11px; height: 11px; border-radius: 50%; background: #3b4261; display: block; }
   .titlebar .t { flex: 1; text-align: center; margin-right: 46px; }
 
   .screen { flex: 1; overflow: auto; padding: 22px 28px 28px; scroll-padding-top: 20px; }
@@ -90,7 +100,7 @@
   .block { margin-bottom: 1.6em; }
   .line { margin: 0; white-space: pre-wrap; word-break: break-word; }
   .ps1 { color: var(--dim); user-select: none; }
-  .ps1 b { color: var(--accent); font-weight: 400; }
+  .ps1 b { color: var(--magenta); font-weight: 400; }
   .ps1 em { color: var(--blue); font-style: normal; }
   .cmd { color: var(--bright); }
   .out { margin-top: .5em; }
@@ -117,7 +127,7 @@
   .intro { margin-top: 1.6em; max-width: 60ch; }
   .intro p:first-child { color: var(--bright); }
   .cow { margin: 0; font: inherit; line-height: 1.3; cursor: pointer; color: var(--fg); white-space: pre; overflow-x: auto; }
-  .cow:hover .moo { color: var(--accent); }
+  .cow:hover .moo { color: var(--green); }
   .recent { list-style: none; margin: 0; padding: 0; }
   .recent li { display: grid; grid-template-columns: 8ch 1fr; column-gap: 1.5ch; }
   .recent time { color: var(--dim); }
@@ -141,9 +151,121 @@
   /* blog: post view (a pager) */
   .post { max-width: 72ch; }
   .post h1 { font-size: 1em; color: var(--bright); margin: 0 0 .2em; font-weight: 600; }
-  .post h1::before { content: "# "; color: var(--accent); }
+  .post h1::before { content: "# "; color: var(--magenta); }
   .post .meta { color: var(--dim); margin-bottom: 1.4em; }
   .post .end { display: inline-block; background: var(--fg); color: var(--bg); padding: 0 .5ch; margin-top: .6em; }
+
+  /* long-form article */
+  .post.long { max-width: 82ch; }
+  .post.long > p, .post.long li { line-height: 1.8; }
+  .post.long .lede { color: var(--bright); }
+  .post h2, .post h3 { font-size: 1em; font-weight: 600; margin: 2.6em 0 .9em; }
+  .post h2 { color: var(--accent); }
+  .post h3 { color: var(--blue); margin-top: 2em; }
+  .post h2::before { content: "## "; color: var(--magenta); font-weight: 400; }
+  .post h3::before { content: "### "; color: var(--magenta); font-weight: 400; }
+  .post strong { color: var(--bright); font-weight: 600; }
+  .post em { font-style: italic; color: var(--bright); }
+  .post :not(pre) > code {
+    color: var(--teal); background: #24283b; padding: .05em .45ch; border-radius: 3px;
+    font-size: .94em;
+  }
+  .post ul { list-style: none; padding-left: 2.5ch; margin: 0 0 1.2em; }
+  .post ul > li { position: relative; }
+  .post ul > li::before { content: "-"; position: absolute; left: -2ch; color: var(--magenta); }
+  .post ol { padding-left: 3.5ch; margin: 0 0 1.2em; }
+  .post ol > li::marker { color: var(--dim); }
+  .post li + li { margin-top: .3em; }
+  .post blockquote {
+    margin: 1.8em 0; padding: .1em 0 .1em 2.5ch;
+    border-left: 2px solid var(--magenta); color: var(--fg);
+  }
+  .post blockquote p { margin: 0 0 .4em; font-style: italic; }
+  .post blockquote cite { color: var(--dim); font-style: normal; }
+  .post .callout {
+    margin: 1.8em 0; padding: .8em 2ch; border: 1px solid #2f3549; border-radius: 4px;
+    background: #1e2030;
+  }
+  .post .callout p:last-child { margin-bottom: 0; }
+  .post .callout .tag { color: var(--accent-2); font-weight: 600; }
+  .post hr { border: 0; text-align: center; color: var(--faint); margin: 2.4em 0; }
+  .post hr::before { content: "· · ·"; letter-spacing: 1ch; }
+  .post sup { font-size: .75em; color: var(--accent-2); }
+
+  /* code blocks, bat-style: filename header + line numbers */
+  .post figure { margin: 1.8em 0; }
+  .post figure.code {
+    background: #16161e; border: 1px solid #232433; border-radius: 4px; overflow: hidden;
+  }
+  .post figure.code figcaption {
+    display: flex; justify-content: space-between; gap: 2ch;
+    padding: .35em 1.5ch; border-bottom: 1px solid #232433;
+    color: var(--dim); font-size: .85em;
+  }
+  .post figure.code figcaption b { color: var(--fg); font-weight: 400; }
+  .post pre { margin: 0; font: inherit; }
+  .post figure.code pre { padding: .8em 0; overflow-x: auto; font-size: .9em; line-height: 1.6; counter-reset: ln; }
+  .post figure.code code { display: block; min-width: max-content; }
+  .post .l { display: block; padding-right: 2.5ch; }
+  .post .l::before {
+    counter-increment: ln; content: counter(ln);
+    display: inline-block; width: 3.5ch; margin-right: 2ch; text-align: right;
+    color: #3b4261; user-select: none;
+  }
+  .post .l.hl { background: #292e42; }
+  .tk-k { color: var(--magenta); }
+  .tk-s { color: var(--green); }
+  .tk-n { color: var(--orange); }
+  .tk-c { color: var(--dim); font-style: italic; }
+  .tk-f { color: var(--accent); }
+  .tk-t { color: var(--teal); }
+  .tk-o { color: #89ddff; }
+  .tk-p { color: var(--dim); }
+  .tk-pr { color: var(--magenta); user-select: none; }
+  .tk-out { color: var(--fg); opacity: .8; }
+
+  /* figures: ascii + svg */
+  .post figure.fig figcaption { color: var(--dim); font-size: .85em; margin-top: .8em; }
+  .post figure.fig figcaption b { color: var(--accent-2); font-weight: 400; }
+  .post .frame { border: 1px solid #232433; border-radius: 4px; background: #16161e; padding: 1.2em 2ch; overflow-x: auto; }
+  .post .ascii { font-size: .9em; line-height: 1.35; color: var(--fg); white-space: pre; }
+  .post .ascii .a { color: var(--accent); } .post .ascii .y { color: var(--accent-2); } .post .ascii .d { color: var(--dim); }
+  .dg { display: block; width: 100%; min-width: 620px; height: auto; }
+  .dg text { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 14px; fill: var(--fg); }
+  .dg .box { fill: #1a1b26; stroke: #3b4261; }
+  .dg .hot { stroke: var(--accent); }
+  .dg .dash { stroke-dasharray: 5 4; }
+  .dg .hd { fill: var(--accent-2); }
+  .dg .lbl { fill: var(--dim); font-size: 12.5px; }
+  .dg .ac { fill: var(--accent); }
+  .dg .gr { fill: var(--green); }
+  .dg .sep { stroke: #2f3549; }
+  .dg .wire { stroke: var(--dim); fill: none; stroke-width: 1.3; }
+  .dg .wire.a { stroke: var(--accent); }
+  .dg .ah { fill: var(--dim); } .dg .ah.a { fill: var(--accent); }
+  .dg .dot { fill: var(--accent); }
+
+  /* tables */
+  .post .tbl { overflow-x: auto; margin: 1.8em 0; }
+  .post table { border-collapse: collapse; min-width: 52ch; }
+  .post th, .post td { text-align: left; padding: .25em 3ch .25em 0; vertical-align: top; }
+  .post th { color: var(--accent-2); font-weight: 400; border-bottom: 1px solid var(--faint); }
+  .post td.num, .post th.num { text-align: right; }
+  .post tfoot td { border-top: 1px solid var(--faint); color: var(--bright); }
+  .post td code { white-space: nowrap; }
+
+  .post .notes { margin-top: 3em; padding-top: 1em; border-top: 1px solid var(--faint); color: var(--dim); font-size: .9em; }
+  .post .notes ol { padding-left: 3ch; }
+
+  /* less-style pager line, sticks to the bottom while reading */
+  .pager {
+    position: sticky; bottom: -28px; z-index: 2;
+    display: flex; gap: 2ch; width: calc(100% + 56px); margin: 2.4em -28px -28px;
+    padding: 0 28px; text-align: left;
+    background: var(--fg); color: var(--bg); line-height: 1.75;
+  }
+  .pager .pct { margin-left: auto; font-weight: 600; }
+  .pager .keys { opacity: .7; }
 
   /* projects: tree */
   .tree .node { position: relative; }
@@ -158,7 +280,7 @@
   .prose { max-width: 70ch; }
   .toml { margin: 0; font: inherit; white-space: pre-wrap; }
   .toml .k { color: var(--accent-2); }
-  .toml .s { color: var(--accent); }
+  .toml .s { color: var(--green); }
   .toml .h { color: var(--blue); }
   .log { margin: 0; font: inherit; white-space: pre-wrap; }
   .log .sha { color: var(--accent-2); }
@@ -170,7 +292,7 @@
     display: flex; align-items: stretch;
     height: 28px; line-height: 28px;
     background: var(--bar);
-    border-top: 1px solid #1d2026;
+    border-top: 1px solid #232433;
     font-size: 13px;
     white-space: nowrap;
   }
@@ -181,11 +303,11 @@
   .wins::-webkit-scrollbar { display: none; }
   .wins button { padding: 0 1.2ch; color: var(--dim); }
   .wins button:hover { color: var(--fg); }
-  .wins button[aria-current="page"] { color: var(--bright); background: #20242a; }
+  .wins button[aria-current="page"] { color: var(--bright); background: #292e42; }
   .wins button[aria-current="page"] .flagc { color: var(--accent); }
   .right { display: flex; color: var(--dim); }
   .right span { padding: 0 1.2ch; }
-  .right .clock { color: var(--bg); background: #3a3f47; color: var(--bright); }
+  .right .clock { background: var(--accent); color: var(--bg); font-weight: 600; }
 
   /* ---- overlays ---- */
   .popup {
@@ -193,7 +315,7 @@
     width: min(56ch, calc(100% - 32px));
     background: var(--bg); border: 1px solid var(--accent-2);
     padding: 1em 1.6ch 1.2em; z-index: 5;
-    box-shadow: 0 0 0 9999px rgba(8,9,11,.55);
+    box-shadow: 0 0 0 9999px rgba(13,14,20,.6);
   }
   .popup[hidden] { display: none; }
   .popup h2 { font-size: 1em; font-weight: 400; color: var(--accent-2); margin: 0 0 .7em; }
@@ -229,9 +351,12 @@
     .right .br, .right .date { display: none; }
     .sess { padding: 0 1ch; }
     .wins button { padding: 0 1ch; }
+    .pager { bottom: -24px; width: calc(100% + 32px); margin: 2.4em -16px -24px; padding: 0 16px; }
+    .pager .keys { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
     .cursor { animation: none; }
+    body, .term { transition: none; }
   }
 </style>
 </head>
@@ -271,7 +396,7 @@
                     <dt>contact</dt><dd><a href="mailto:webmaster@tthisk.com">webmaster@tthisk.com</a></dd>
                   </dl>
                   <div class="swatch" aria-hidden="true">
-                    <i style="background:#2a2e35"></i><i style="background:#e08a8a"></i><i style="background:#9ece8a"></i><i style="background:#e2c08d"></i><i style="background:#8fb4d8"></i><i style="background:#c3a6e0"></i><i style="background:#8ccfcf"></i><i style="background:#c8ccd2"></i>
+                    <i style="background:#414868"></i><i style="background:#f7768e"></i><i style="background:#9ece6a"></i><i style="background:#e0af68"></i><i style="background:#7aa2f7"></i><i style="background:#bb9af7"></i><i style="background:#7dcfff"></i><i style="background:#c0caf5"></i>
                   </div>
                 </div>
               </div>
@@ -334,6 +459,392 @@
         <p class="line"><span class="ps1"><b>matthis@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
       </div>
       <div id="blog-post" hidden></div>
+      <!-- Full text of post 0. Static, author-written HTML: openPost() copies it in as-is. -->
+      <template id="post-body-0">
+        <p class="lede">Last month I spent a weekend writing a Lisp interpreter in TypeScript. Not a fast one, not a complete one, but one that can define functions, close over variables and loop a million times without blowing the stack. It came out at almost exactly four hundred lines.</p>
+
+        <p>I had read about this kind of project many times and always thought I understood it. Writing it showed me I didn't, in two specific places: scoping and tail calls. This post walks through the interpreter in the order I built it and points out where I went wrong, because the wrong turns taught me more than the parts that worked first time.</p>
+
+        <p>If you want to follow along, all you need is Node and a text editor. Every snippet below is taken from the real source, trimmed a little for space.</p>
+
+        <h2>Why Lisp?</h2>
+
+        <p>Most languages spend a big chunk of their implementation on syntax. Operator precedence, statements versus expressions, semicolon rules, string interpolation: all of that has to be parsed before anything interesting happens. Lisp skips almost all of it. A program is a nested list written with parentheses, and the first element of each list says what to do with the rest.</p>
+
+        <p>That means the parser is tiny and the weekend can go on the part that is actually hard: making the program <em>run</em>. The whole pipeline looks like this:</p>
+
+        <figure class="fig">
+          <div class="frame">
+            <svg class="dg" viewBox="0 0 820 190" role="img" aria-labelledby="fig1t">
+              <title id="fig1t">The interpreter pipeline: source text is tokenized, read into an expression tree, evaluated against an environment, and the result is printed. Then it loops.</title>
+              <defs>
+                <marker id="ar1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+                <marker id="ar1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah a"/></marker>
+              </defs>
+              <path class="wire" d="M750 48 V26 H70 V44" marker-end="url(#ar1)"/>
+              <text class="lbl" x="410" y="18" text-anchor="middle">repeat for every line you type</text>
+
+              <rect class="box" x="10"  y="50" width="120" height="50" rx="4"/>
+              <rect class="box" x="180" y="50" width="120" height="50" rx="4"/>
+              <rect class="box" x="350" y="50" width="120" height="50" rx="4"/>
+              <rect class="box hot" x="520" y="50" width="120" height="50" rx="4"/>
+              <rect class="box" x="690" y="50" width="120" height="50" rx="4"/>
+              <text x="70"  y="80" text-anchor="middle">source</text>
+              <text x="240" y="80" text-anchor="middle">tokenize</text>
+              <text x="410" y="80" text-anchor="middle">read</text>
+              <text x="580" y="80" text-anchor="middle" class="ac">eval</text>
+              <text x="750" y="80" text-anchor="middle">print</text>
+
+              <line class="wire" x1="132" y1="75" x2="176" y2="75" marker-end="url(#ar1)"/>
+              <line class="wire" x1="302" y1="75" x2="346" y2="75" marker-end="url(#ar1)"/>
+              <line class="wire" x1="472" y1="75" x2="516" y2="75" marker-end="url(#ar1)"/>
+              <line class="wire" x1="642" y1="75" x2="686" y2="75" marker-end="url(#ar1)"/>
+              <text class="lbl" x="155" y="68" text-anchor="middle">str</text>
+              <text class="lbl" x="325" y="68" text-anchor="middle">tokens</text>
+              <text class="lbl" x="495" y="68" text-anchor="middle">Expr</text>
+              <text class="lbl" x="665" y="68" text-anchor="middle">Value</text>
+
+              <text class="lbl gr" x="70"  y="122" text-anchor="middle">"(+ 1 2)"</text>
+              <text class="lbl" x="240" y="122" text-anchor="middle">( + 1 2 )</text>
+              <text class="lbl" x="410" y="122" text-anchor="middle">[+, 1, 2]</text>
+              <text class="lbl" x="750" y="122" text-anchor="middle">3</text>
+
+              <rect class="box" x="520" y="142" width="120" height="36" rx="4"/>
+              <text x="580" y="165" text-anchor="middle">env</text>
+              <line class="wire a" x1="580" y1="104" x2="580" y2="138" marker-start="url(#ar1a)" marker-end="url(#ar1a)"/>
+              <text class="lbl" x="594" y="126">lookup / define</text>
+            </svg>
+          </div>
+          <figcaption><b>fig. 1</b> &mdash; Four stages and a loop. Only <code>eval</code> talks to the environment.</figcaption>
+        </figure>
+
+        <p>Each box is one file. I'll go through them from left to right.</p>
+
+        <h2>Tokenizing: the postcard parser</h2>
+
+        <p>The first step turns a string into a flat list of tokens. The classic trick is to pad every parenthesis with spaces and then split on whitespace. It feels like cheating, and it is, but it works for everything except strings that contain spaces. I decided I could live without those for a weekend.</p>
+
+        <figure class="code">
+          <figcaption><b>src/reader.ts</b><span>typescript</span></figcaption>
+          <pre><code data-lang="ts">export function tokenize(src: string): string[] {
+  return src
+    .replace(/;.*$/gm, "")   // strip comments
+    .replace(/\(/g, " ( ")
+    .replace(/\)/g, " ) ")
+    .split(/\s+/)
+    .filter(Boolean);
+}</code></pre>
+        </figure>
+
+        <p>Seven lines. That is the entire lexer. For comparison, the lexer in a typical JavaScript engine is several thousand.</p>
+
+        <h2>Reading: from tokens to a tree</h2>
+
+        <p>The reader consumes tokens and builds nested arrays. When it sees an opening parenthesis, it keeps reading expressions until it hits the matching close. Anything else is an <em>atom</em>: a number, a string, or a symbol.</p>
+
+        <figure class="code">
+          <figcaption><b>src/reader.ts</b><span>typescript</span></figcaption>
+          <pre><code data-lang="ts">export type Expr = number | string | symbol | Expr[];
+
+export function read(tokens: string[]): Expr {
+  const tok = tokens.shift();
+  if (tok === undefined) throw new SyntaxError("unexpected end of input");
+
+  if (tok === "(") {
+    const list: Expr[] = [];
+    while (tokens[0] !== ")") {
+      if (tokens.length === 0) throw new SyntaxError("missing )");
+      list.push(read(tokens));
+    }
+    tokens.shift(); // drop the ")"
+    return list;
+  }
+  if (tok === ")") throw new SyntaxError("unexpected )");
+  return atom(tok);
+}
+
+function atom(tok: string): Expr {
+  const n = Number(tok);
+  if (!Number.isNaN(n)) return n;
+  if (tok.startsWith('"')) return tok.slice(1, -1);
+  return Symbol.for(tok);
+}</code></pre>
+        </figure>
+
+        <p>I used JavaScript's <code>Symbol.for</code> for Lisp symbols. It interns them for free, so two occurrences of <code>x</code> are the same value and comparing them is a pointer check. Here is what the reader produces for a small function definition:</p>
+
+        <figure class="fig">
+          <div class="frame"><pre class="ascii"><span class="a">(define (square x) (* x x))</span>
+     <span class="d">│</span>
+     <span class="d">▼  tokenize</span>
+<span class="y">(</span>  define  <span class="y">(</span>  square  x  <span class="y">)</span>  <span class="y">(</span>  *  x  x  <span class="y">)</span>  <span class="y">)</span>
+     <span class="d">│</span>
+     <span class="d">▼  read</span>
+<span class="y">list</span>
+<span class="d">├──</span> define
+<span class="d">├──</span> <span class="y">list</span>
+<span class="d">│   ├──</span> square
+<span class="d">│   └──</span> x
+<span class="d">└──</span> <span class="y">list</span>
+<span class="d">    ├──</span> *
+<span class="d">    ├──</span> x
+<span class="d">    └──</span> x</pre></div>
+          <figcaption><b>fig. 2</b> &mdash; Twelve tokens become a tree with three lists. The tree <em>is</em> the program.</figcaption>
+        </figure>
+
+        <p>This is the property people mean when they say Lisp is <em>homoiconic</em>: the program and the data structure it is stored in look the same. It is also why macros are so natural in Lisp, though I didn't get to those.</p>
+
+        <h2>Environments</h2>
+
+        <p>Before we can evaluate anything we need somewhere to keep variables. An environment is a map from symbols to values, plus a pointer to a parent environment. Looking up a name walks up the chain until it finds a match or runs out of parents.</p>
+
+        <figure class="code">
+          <figcaption><b>src/env.ts</b><span>typescript</span></figcaption>
+          <pre><code data-lang="ts">export class Env {
+  private vars = new Map&lt;symbol, Value&gt;();
+
+  constructor(private parent?: Env) {}
+
+  define(name: symbol, value: Value): void {
+    this.vars.set(name, value);
+  }
+
+  lookup(name: symbol): Value {
+    if (this.vars.has(name)) return this.vars.get(name)!;
+    if (this.parent) return this.parent.lookup(name);
+    throw new ReferenceError(`unbound symbol: ${Symbol.keyFor(name)}`);
+  }
+}</code></pre>
+        </figure>
+
+        <p>The global environment is just an <code>Env</code> with no parent, pre-filled with built-ins like <code>+</code>, <code>car</code> and <code>display</code>. Every function call creates a new <code>Env</code> whose parent is... well, that's the first thing I got wrong.</p>
+
+        <h2>Evaluating</h2>
+
+        <p>The evaluator is the heart of the interpreter. Its job is short to state:</p>
+
+        <ol>
+          <li>A <strong>symbol</strong> evaluates to whatever it is bound to.</li>
+          <li>A <strong>number or string</strong> evaluates to itself.</li>
+          <li>A <strong>list</strong> is either a <em>special form</em> (<code>if</code>, <code>define</code>, <code>lambda</code>, <code>quote</code>), which has its own rules, or a <em>function call</em>, where you evaluate every element and apply the first to the rest.</li>
+        </ol>
+
+        <p>Here is the core of it. Look at the <code>while (true)</code> and the two <code>continue</code> statements; we'll come back to them.</p>
+
+        <figure class="code">
+          <figcaption><b>src/eval.ts</b><span>typescript</span></figcaption>
+          <pre><code data-lang="ts">export function evaluate(x: Expr, env: Env): Value {
+  while (true) {
+    if (typeof x === "symbol") return env.lookup(x);
+    if (!Array.isArray(x)) return x; // numbers and strings evaluate to themselves
+
+    const [op, ...args] = x;
+    switch (op) {
+      case S.quote:
+        return args[0];
+      case S.if: {
+        const [test, then, otherwise] = args;
+        x = evaluate(test, env) !== false ? then : otherwise;
+        continue; // tail position: loop instead of recursing
+      }
+      case S.define:
+        env.define(args[0] as symbol, evaluate(args[1], env));
+        return null;
+      case S.lambda:
+        return new Lambda(args[0] as symbol[], args[1], env);
+    }
+
+    const fn = evaluate(op, env);
+    const vals = args.map((a) =&gt; evaluate(a, env));
+    if (fn instanceof Lambda) {
+      env = fn.bind(vals); // new frame, parent is fn.env
+      x = fn.body;
+      continue;
+    }
+    return (fn as Builtin)(...vals);
+  }
+}</code></pre>
+        </figure>
+
+        <h3>Mistake one: dynamic scope by accident</h3>
+
+        <p>My first version of the function call looked like this:</p>
+
+        <figure class="code">
+          <figcaption><b>src/eval.ts</b> <span>diff</span></figcaption>
+          <pre><code data-lang="ts">// v1, wrong: the new frame's parent is whoever *called* the function
+env = new Env(env);
+
+// v2, right: the parent is wherever the function was *defined*
+env = new Env(fn.env);</code></pre>
+        </figure>
+
+        <p>Version one passed all my early tests, because in small programs the caller and the definer are usually the same environment: the global one. It broke the moment I wrote a function that returns a function. The inner function looked up its variables in whatever scope happened to call it, not the scope it was created in. That is <strong>dynamic scope</strong>, and it is what early Lisps actually did, so at least I was historically accurate.</p>
+
+        <div class="callout">
+          <p><span class="tag">note</span> &nbsp;The fix is a single word, but understanding it took me an hour of print statements. A closure is nothing more than a function plus a pointer to the environment it was created in. Once you see that, <code>lambda</code> returning <code>new Lambda(params, body, env)</code> reads as the definition of the word.</p>
+        </div>
+
+        <p>Here is what the environments look like after running a counter example. Each call to <code>(c)</code> gets a fresh, empty frame, but its parent is the <code>let</code> frame that holds <code>n</code>, so <code>n</code> survives between calls.</p>
+
+        <figure class="fig">
+          <div class="frame">
+            <svg class="dg" viewBox="0 0 820 360" role="img" aria-labelledby="fig3t">
+              <title id="fig3t">Environment diagram: a call frame points to a let frame holding n, which points to the global frame. The global c is bound to a closure whose env is the let frame.</title>
+              <defs>
+                <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+                <marker id="ar2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah a"/></marker>
+              </defs>
+
+              <rect class="box" x="40" y="20" width="320" height="112" rx="4"/>
+              <text class="hd" x="56" y="42">global</text>
+              <line class="sep" x1="40" y1="52" x2="360" y2="52"/>
+              <text x="56" y="74">+ - * = car …</text><text class="lbl" x="250" y="74">builtins</text>
+              <text x="56" y="96">make-counter</text><text class="lbl" x="250" y="96">λ</text>
+              <text x="56" y="118">c</text><circle class="dot" cx="340" cy="114" r="4"/>
+
+              <rect class="box hot" x="40" y="180" width="320" height="64" rx="4"/>
+              <text class="hd" x="56" y="202">let frame</text>
+              <line class="sep" x1="40" y1="212" x2="360" y2="212"/>
+              <text x="56" y="234">n</text><text class="gr" x="250" y="234">2</text>
+
+              <rect class="box dash" x="40" y="290" width="320" height="54" rx="4"/>
+              <text class="hd" x="56" y="312">call frame  (c)</text>
+              <text class="lbl" x="56" y="334">no parameters, nothing defined</text>
+
+              <rect class="box" x="480" y="160" width="300" height="100" rx="4"/>
+              <text class="hd" x="496" y="182">closure  λ()</text>
+              <line class="sep" x1="480" y1="192" x2="780" y2="192"/>
+              <text x="496" y="214">body</text><text class="lbl" x="560" y="214">(set! n (+ n 1)) n</text>
+              <text x="496" y="240">env</text><circle class="dot" cx="544" cy="236" r="4"/>
+
+              <line class="wire" x1="200" y1="178" x2="200" y2="136" marker-end="url(#ar2)"/>
+              <text class="lbl" x="210" y="161">parent</text>
+              <line class="wire" x1="200" y1="288" x2="200" y2="248" marker-end="url(#ar2)"/>
+              <text class="lbl" x="210" y="271">parent</text>
+
+              <path class="wire a" d="M344 114 C 420 114, 440 150, 476 172" marker-end="url(#ar2a)"/>
+              <text class="lbl" x="420" y="108">value</text>
+              <path class="wire a" d="M541 239 C 510 270, 420 256, 364 220" marker-end="url(#ar2a)"/>
+              <text class="lbl" x="440" y="278">env</text>
+
+              <text class="lbl" x="480" y="306">every (c) gets a new call frame,</text>
+              <text class="lbl" x="480" y="326">but n lives on in the let frame</text>
+            </svg>
+          </div>
+          <figcaption><b>fig. 3</b> &mdash; Arrows point to parents. Solid blue arrows are the ones that make closures work.</figcaption>
+        </figure>
+
+        <h3>Mistake two: closures that captured too early</h3>
+
+        <p>The second bug was subtler. To "capture" the environment, my first <code>Lambda</code> constructor made a <em>copy</em> of it. That seemed safe: nobody could change the captured variables from outside. But it meant a recursive function couldn't see itself. <code>(define (fact n) ...)</code> creates the lambda <em>before</em> binding <code>fact</code>, so the copy was taken one step too soon.</p>
+
+        <p>Holding a reference instead of a copy fixed recursion, and it is also what makes <code>set!</code> inside a closure behave the way you expect. Sharing is the point.</p>
+
+        <h2>Tail calls, or how to loop without loops</h2>
+
+        <p>Lisp has no <code>for</code> or <code>while</code>. You loop by having a function call itself. A naive evaluator turns every one of those calls into a JavaScript call, and Node's stack runs out after about ten thousand levels:</p>
+
+        <figure class="code">
+          <figcaption><b>terminal</b><span>shell</span></figcaption>
+          <pre><code data-lang="console">$ npx tsx src/repl.ts
+λ (define (loop i) (if (= i 0) "done" (loop (- i 1))))
+λ (loop 100000)
+RangeError: Maximum call stack size exceeded</code></pre>
+        </figure>
+
+        <p>The fix is the <code>while (true)</code> in <code>evaluate</code>. When the last thing a function does is call another function (a <em>tail call</em>), there is nothing left to do in the current frame. So instead of recursing, the evaluator swaps in the new expression and environment and goes round the loop again. The JavaScript stack stays flat no matter how deep the Lisp recursion goes.</p>
+
+        <p>Only two places are in tail position in this little language:</p>
+
+        <ul>
+          <li>the chosen branch of an <code>if</code>, and</li>
+          <li>the body of a function being called.</li>
+        </ul>
+
+        <p>Those are exactly the two <code>continue</code> statements. Everything else, like evaluating arguments, still recurses normally, which is fine because argument lists are never deep.</p>
+
+        <blockquote>
+          <p>A tail call is a goto with arguments.</p>
+          <cite>&mdash; paraphrasing Guy Steele, "Lambda: The Ultimate GOTO" (1977)</cite>
+        </blockquote>
+
+        <h2>The REPL</h2>
+
+        <p>The last file ties it together: read a line, evaluate it in the global environment, print the result, repeat. Errors are caught and printed so a typo doesn't kill the session.</p>
+
+        <figure class="code">
+          <figcaption><b>src/repl.ts</b><span>typescript</span></figcaption>
+          <pre><code data-lang="ts">import * as readline from "node:readline";
+
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: "λ " });
+
+rl.prompt();
+rl.on("line", (line) =&gt; {
+  try {
+    const value = evaluate(read(tokenize(line)), globalEnv);
+    if (value !== null) console.log(show(value));
+  } catch (err) {
+    console.error(`error: ${(err as Error).message}`);
+  }
+  rl.prompt();
+});</code></pre>
+        </figure>
+
+        <p>And here it is running the counter from fig. 3, plus the loop that used to crash:</p>
+
+        <figure class="code">
+          <figcaption><b>terminal</b><span>lisp</span></figcaption>
+          <pre><code data-lang="lisp">λ (define (make-counter)
+    (let ((n 0))
+      (lambda () (set! n (+ n 1)) n)))
+λ (define c (make-counter))
+λ (c)
+1
+λ (c)
+2
+λ (loop 1000000) ; a million deep, flat stack
+"done"</code></pre>
+        </figure>
+
+        <h2>Where the four hundred lines went</h2>
+
+        <p>I was surprised by the split. The parts I had worried about were small, and the part I thought would be trivial, the built-ins, took the most room.</p>
+
+        <div class="tbl">
+          <table>
+            <thead><tr><th>file</th><th class="num">lines</th><th>what it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>reader.ts</code></td><td class="num">74</td><td>tokenize, read, atoms, printing values back out</td></tr>
+              <tr><td><code>env.ts</code></td><td class="num">31</td><td>scope chain</td></tr>
+              <tr><td><code>eval.ts</code></td><td class="num">168</td><td>special forms, <code>let</code> and <code>set!</code>, tail calls</td></tr>
+              <tr><td><code>builtins.ts</code></td><td class="num">92</td><td>arithmetic, lists, comparisons, <code>display</code></td></tr>
+              <tr><td><code>repl.ts</code></td><td class="num">35</td><td>the loop, history, error output</td></tr>
+            </tbody>
+            <tfoot><tr><td>total</td><td class="num">400</td><td></td></tr></tfoot>
+          </table>
+        </div>
+
+        <h2>What I'd do next</h2>
+
+        <p>There's a long list, but three things stand out:</p>
+
+        <ol>
+          <li><strong>Proper strings.</strong> The space-padding tokenizer has to go. A small hand-written scanner is maybe forty more lines.</li>
+          <li><strong>Macros.</strong> Since code is already data, <code>defmacro</code> is mostly "evaluate the body, then evaluate what it returns". I want to see how far that gets before hygiene becomes a problem.</li>
+          <li><strong>Better errors.</strong> Right now an error tells you <em>what</em> went wrong but not <em>where</em>. Keeping line numbers on tokens would fix that.</li>
+        </ol>
+
+        <hr>
+
+        <p>The biggest lesson wasn't about Lisp. It was that "I understand how this works" and "I can build this" are very different claims, and the gap between them is where the learning is. If you've never written an interpreter, I can't recommend a weekend of it enough.<sup>1</sup> Pick the smallest language you can find and make it run.</p>
+
+        <div class="notes">
+          <ol>
+            <li>Peter Norvig's essay <a href="https://norvig.com/lispy.html">"(How to Write a (Lisp) Interpreter (in Python))"</a> is the classic starting point, and much of the structure here follows it.</li>
+          </ol>
+        </div>
+      </template>
     </section>
 
     <!-- 2: projects -->
@@ -450,7 +961,7 @@
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var NAMES = ["home", "blog", "projects", "about"];
   var POSTS = [
-    { slug: "writing-a-tiny-lisp.md", title: "Writing a tiny Lisp in a weekend", date: "2026-10-28", read: "6 min",
+    { slug: "writing-a-tiny-lisp.md", title: "Writing a tiny Lisp in a weekend", date: "2026-10-28", read: "11 min",
       body: ["A reader, an evaluator and a REPL in about four hundred lines. Lisp is the rare language where the parser fits on a postcard, so most of the weekend goes into the interesting part: environments, closures and tail calls.",
              "This post walks through each piece in the order I wrote it, including the two places where I got scoping wrong."] },
     { slug: "in-defence-of-boring-tech.md", title: "In defence of boring technology", date: "2026-09-14", read: "5 min",
@@ -562,25 +1073,97 @@
     if (cur !== 1) show(1, true);
     token++;
     postOpen = true;
+    document.body.classList.add("reading");
     var el = $("blog-post");
+    // Full posts live in <template id="post-body-N"> (trusted, author-written HTML).
+    // Short posts are built from their escaped summary paragraphs.
+    var tpl = $("post-body-" + n);
+    var body = tpl ? tpl.innerHTML :
+      p.body.map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") +
+      '<p class="dim">[placeholder: the full post goes here]</p>';
     el.innerHTML =
       '<div class="block"><p class="line"><span class="ps1"><b>matthis@tthisk</b>:<em>~</em>$ </span>' +
       '<span class="cmd" data-cmd="less blog/' + esc(p.slug) + '">less blog/' + esc(p.slug) + '</span></p>' +
-      '<div class="out post"><h1>' + esc(p.title) + '</h1>' +
+      '<div class="out post' + (tpl ? " long" : "") + '"><h1>' + esc(p.title) + '</h1>' +
       '<div class="meta">' + esc(p.date) + ' &middot; ' + esc(p.read) + ' read</div>' +
-      p.body.map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") +
-      '<p class="dim">[placeholder: the full post goes here]</p>' +
-      '<button type="button" class="end" id="post-q">(END) press q to return</button></div></div>';
+      body + '</div></div>' +
+      '<button type="button" class="pager" id="post-q"><span>blog/' + esc(p.slug) + '</span>' +
+      '<span class="pct" id="post-pct">0%</span><span class="keys">space/b page &middot; g/G ends &middot; q quit</span></button>';
+    el.querySelectorAll("pre code[data-lang]").forEach(highlight);
     $("blog-list").hidden = true; el.hidden = false;
+    updatePager();
     $("post-q").addEventListener("click", function () { closePost(); setHash("blog"); });
     screen.scrollTop = 0;
     if (!keepHash) setHash("blog/" + n);
     typeIn(el);
   }
 
+  // ---- tiny syntax highlighter for the post's code blocks ----
+  // Works on textContent and escapes every piece, so it never trusts markup.
+  var LANGS = {
+    ts: [
+      [/\/\/.*/y, "c"],
+      [/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/y, "s"],
+      [/\/(?![\/*\s])(?:\\.|[^\/\n])+\/[gimsuy]*(?=[.,)\s])/y, "s"],
+      [/\b(?:export|function|return|const|let|if|else|while|true|false|throw|new|switch|case|continue|class|private|constructor|import|from|as|typeof|instanceof|try|catch|null|undefined|this|void)\b/y, "k"],
+      [/\b(?:string|number|symbol|boolean)\b|\b[A-Z][A-Za-z0-9]*\b/y, "t"],
+      [/\b\d+(?:\.\d+)?\b/y, "n"],
+      [/(?<![\w$])[A-Za-z_$][\w$]*(?=\()/y, "f"],
+      [/=>|===|!==|[=!<>+\-*\/?:|&]+/y, "o"],
+      [/[{}()[\];,.]/y, "p"]
+    ],
+    lisp: [
+      [/;.*/y, "c"],
+      [/^λ /my, "pr"],
+      [/"(?:\\.|[^"\\])*"/y, "s"],
+      [/(?<=\()(?:define|lambda|let|if|set!|quote)(?=[\s)])/y, "k"],
+      [/-?\b\d+\b/y, "n"],
+      [/(?<=\()[^\s()]+/y, "f"],
+      [/[()]/y, "p"]
+    ],
+    console: [
+      [/^\$ |^λ /my, "pr"],
+      [/^(?:RangeError|Error).*$/my, "out"],
+      [/"(?:\\.|[^"\\])*"/y, "s"],
+      [/\b\d+\b/y, "n"]
+    ]
+  };
+  function highlight(code) {
+    var src = code.textContent, rules = LANGS[code.dataset.lang] || [], out = "", plain = "", i = 0;
+    while (i < src.length) {
+      var hit = null;
+      for (var r = 0; r < rules.length && !hit; r++) {
+        rules[r][0].lastIndex = i;
+        var m = rules[r][0].exec(src);
+        if (m && m[0].length) hit = [m[0], rules[r][1]];
+      }
+      if (hit) {
+        out += esc(plain); plain = "";
+        out += hit[0].split("\n").map(function (part) {
+          return part ? '<span class="tk-' + hit[1] + '">' + esc(part) + "</span>" : "";
+        }).join("\n");
+        i += hit[0].length;
+      } else { plain += src[i]; i++; }
+    }
+    out += esc(plain);
+    code.innerHTML = out.split("\n").map(function (l) { return '<span class="l">' + (l || " ") + "</span>"; }).join("");
+  }
+
+  // ---- less-style pager percentage ----
+  function updatePager() {
+    var pct = $("post-pct"); if (!pct || !postOpen) return;
+    var max = screen.scrollHeight - screen.clientHeight;
+    var v = max <= 0 ? 100 : Math.round(screen.scrollTop / max * 100);
+    pct.textContent = v >= 100 ? "(END)" : v + "%";
+  }
+  screen.addEventListener("scroll", updatePager, { passive: true });
+  window.addEventListener("resize", updatePager);
+  $("term").addEventListener("transitionend", function (e) { if (e.propertyName === "height") updatePager(); });
+
   function closePost(silent) {
     if (!postOpen) return;
     postOpen = false;
+    document.body.classList.remove("reading");
     $("blog-post").hidden = true; $("blog-post").innerHTML = "";
     $("blog-list").hidden = false;
     if (!silent) typeIn($("blog-list"));
@@ -712,6 +1295,19 @@
       return;
     }
     if (/^[0-3]$/.test(k)) { show(+k); return; }
+    if (postOpen) {
+      var page = screen.clientHeight - 60, line = 40, top = null;
+      if (k === "j" || k === "ArrowDown") top = screen.scrollTop + line;
+      else if (k === "k" || k === "ArrowUp") top = screen.scrollTop - line;
+      else if (k === " " || k === "f" || k === "PageDown") top = screen.scrollTop + page;
+      else if (k === "b" || k === "PageUp") top = screen.scrollTop - page;
+      else if (k === "g" || k === "Home") top = 0;
+      else if (k === "G" || k === "End") top = screen.scrollHeight;
+      if (top !== null) {
+        e.preventDefault();
+        screen.scrollTo({ top: top, behavior: reduce || line === Math.abs(top - screen.scrollTop) ? "auto" : "smooth" });
+      }
+    }
     if (k.length === 1) {
       typed = (typed + k.toLowerCase()).slice(-4);
       if (typed === "sudo") { typed = ""; sudo(); }
