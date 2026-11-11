@@ -1,0 +1,383 @@
+<p class="lede">Last month I spent a weekend writing a Lisp interpreter in TypeScript. Not a fast one, not a complete one, but one that can define functions, close over variables and loop a million times without blowing the stack. It came out at almost exactly four hundred lines.</p>
+
+<p>I had read about this kind of project many times and always thought I understood it. Writing it showed me I didn't, in two specific places: scoping and tail calls. This post walks through the interpreter in the order I built it and points out where I went wrong, because the wrong turns taught me more than the parts that worked first time.</p>
+
+<p>If you want to follow along, all you need is Node and a text editor. Every snippet below is taken from the real source, trimmed a little for space.</p>
+
+<h2>Why Lisp?</h2>
+
+<p>Most languages spend a big chunk of their implementation on syntax. Operator precedence, statements versus expressions, semicolon rules, string interpolation: all of that has to be parsed before anything interesting happens. Lisp skips almost all of it. A program is a nested list written with parentheses, and the first element of each list says what to do with the rest.</p>
+
+<p>That means the parser is tiny and the weekend can go on the part that is actually hard: making the program <em>run</em>. The whole pipeline looks like this:</p>
+
+<figure class="fig">
+  <div class="frame">
+    <svg class="dg" viewBox="0 0 820 190" role="img" aria-labelledby="fig1t">
+      <title id="fig1t">The interpreter pipeline: source text is tokenized, read into an expression tree, evaluated against an environment, and the result is printed. Then it loops.</title>
+      <defs>
+        <marker id="ar1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+        <marker id="ar1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah a"/></marker>
+      </defs>
+      <path class="wire" d="M750 48 V26 H70 V44" marker-end="url(#ar1)"/>
+      <text class="lbl" x="410" y="18" text-anchor="middle">repeat for every line you type</text>
+
+      <rect class="box" x="10"  y="50" width="120" height="50" rx="4"/>
+      <rect class="box" x="180" y="50" width="120" height="50" rx="4"/>
+      <rect class="box" x="350" y="50" width="120" height="50" rx="4"/>
+      <rect class="box hot" x="520" y="50" width="120" height="50" rx="4"/>
+      <rect class="box" x="690" y="50" width="120" height="50" rx="4"/>
+      <text x="70"  y="80" text-anchor="middle">source</text>
+      <text x="240" y="80" text-anchor="middle">tokenize</text>
+      <text x="410" y="80" text-anchor="middle">read</text>
+      <text x="580" y="80" text-anchor="middle" class="ac">eval</text>
+      <text x="750" y="80" text-anchor="middle">print</text>
+
+      <line class="wire" x1="132" y1="75" x2="176" y2="75" marker-end="url(#ar1)"/>
+      <line class="wire" x1="302" y1="75" x2="346" y2="75" marker-end="url(#ar1)"/>
+      <line class="wire" x1="472" y1="75" x2="516" y2="75" marker-end="url(#ar1)"/>
+      <line class="wire" x1="642" y1="75" x2="686" y2="75" marker-end="url(#ar1)"/>
+      <text class="lbl" x="155" y="68" text-anchor="middle">str</text>
+      <text class="lbl" x="325" y="68" text-anchor="middle">tokens</text>
+      <text class="lbl" x="495" y="68" text-anchor="middle">Expr</text>
+      <text class="lbl" x="665" y="68" text-anchor="middle">Value</text>
+
+      <text class="lbl gr" x="70"  y="122" text-anchor="middle">"(+ 1 2)"</text>
+      <text class="lbl" x="240" y="122" text-anchor="middle">( + 1 2 )</text>
+      <text class="lbl" x="410" y="122" text-anchor="middle">[+, 1, 2]</text>
+      <text class="lbl" x="750" y="122" text-anchor="middle">3</text>
+
+      <rect class="box" x="520" y="142" width="120" height="36" rx="4"/>
+      <text x="580" y="165" text-anchor="middle">env</text>
+      <line class="wire a" x1="580" y1="104" x2="580" y2="138" marker-start="url(#ar1a)" marker-end="url(#ar1a)"/>
+      <text class="lbl" x="594" y="126">lookup / define</text>
+    </svg>
+  </div>
+  <figcaption><b>fig. 1</b> &mdash; Four stages and a loop. Only <code>eval</code> talks to the environment.</figcaption>
+</figure>
+
+<p>Each box is one file. I'll go through them from left to right.</p>
+
+<h2>Tokenizing: the postcard parser</h2>
+
+<p>The first step turns a string into a flat list of tokens. The classic trick is to pad every parenthesis with spaces and then split on whitespace. It feels like cheating, and it is, but it works for everything except strings that contain spaces. I decided I could live without those for a weekend.</p>
+
+<figure class="code">
+  <figcaption><b>src/reader.ts</b><span>typescript</span></figcaption>
+  <pre><code data-lang="ts">export function tokenize(src: string): string[] {
+  return src
+    .replace(/;.*$/gm, "")   // strip comments
+    .replace(/\(/g, " ( ")
+    .replace(/\)/g, " ) ")
+    .split(/\s+/)
+    .filter(Boolean);
+}</code></pre>
+</figure>
+
+<p>Seven lines. That is the entire lexer. For comparison, the lexer in a typical JavaScript engine is several thousand.</p>
+
+<h2>Reading: from tokens to a tree</h2>
+
+<p>The reader consumes tokens and builds nested arrays. When it sees an opening parenthesis, it keeps reading expressions until it hits the matching close. Anything else is an <em>atom</em>: a number, a string, or a symbol.</p>
+
+<figure class="code">
+  <figcaption><b>src/reader.ts</b><span>typescript</span></figcaption>
+  <pre><code data-lang="ts">export type Expr = number | string | symbol | Expr[];
+
+export function read(tokens: string[]): Expr {
+  const tok = tokens.shift();
+  if (tok === undefined) throw new SyntaxError("unexpected end of input");
+
+  if (tok === "(") {
+    const list: Expr[] = [];
+    while (tokens[0] !== ")") {
+      if (tokens.length === 0) throw new SyntaxError("missing )");
+      list.push(read(tokens));
+    }
+    tokens.shift(); // drop the ")"
+    return list;
+  }
+  if (tok === ")") throw new SyntaxError("unexpected )");
+  return atom(tok);
+}
+
+function atom(tok: string): Expr {
+  const n = Number(tok);
+  if (!Number.isNaN(n)) return n;
+  if (tok.startsWith('"')) return tok.slice(1, -1);
+  return Symbol.for(tok);
+}</code></pre>
+</figure>
+
+<p>I used JavaScript's <code>Symbol.for</code> for Lisp symbols. It interns them for free, so two occurrences of <code>x</code> are the same value and comparing them is a pointer check. Here is what the reader produces for a small function definition:</p>
+
+<figure class="fig">
+  <div class="frame"><pre class="ascii"><span class="a">(define (square x) (* x x))</span>
+     <span class="d">│</span>
+     <span class="d">▼  tokenize</span>
+<span class="y">(</span>  define  <span class="y">(</span>  square  x  <span class="y">)</span>  <span class="y">(</span>  *  x  x  <span class="y">)</span>  <span class="y">)</span>
+     <span class="d">│</span>
+     <span class="d">▼  read</span>
+<span class="y">list</span>
+<span class="d">├──</span> define
+<span class="d">├──</span> <span class="y">list</span>
+<span class="d">│   ├──</span> square
+<span class="d">│   └──</span> x
+<span class="d">└──</span> <span class="y">list</span>
+<span class="d">    ├──</span> *
+<span class="d">    ├──</span> x
+<span class="d">    └──</span> x</pre></div>
+  <figcaption><b>fig. 2</b> &mdash; Twelve tokens become a tree with three lists. The tree <em>is</em> the program.</figcaption>
+</figure>
+
+<p>This is the property people mean when they say Lisp is <em>homoiconic</em>: the program and the data structure it is stored in look the same. It is also why macros are so natural in Lisp, though I didn't get to those.</p>
+
+<h2>Environments</h2>
+
+<p>Before we can evaluate anything we need somewhere to keep variables. An environment is a map from symbols to values, plus a pointer to a parent environment. Looking up a name walks up the chain until it finds a match or runs out of parents.</p>
+
+<figure class="code">
+  <figcaption><b>src/env.ts</b><span>typescript</span></figcaption>
+  <pre><code data-lang="ts">export class Env {
+  private vars = new Map&lt;symbol, Value&gt;();
+
+  constructor(private parent?: Env) {}
+
+  define(name: symbol, value: Value): void {
+    this.vars.set(name, value);
+  }
+
+  lookup(name: symbol): Value {
+    if (this.vars.has(name)) return this.vars.get(name)!;
+    if (this.parent) return this.parent.lookup(name);
+    throw new ReferenceError(`unbound symbol: ${Symbol.keyFor(name)}`);
+  }
+}</code></pre>
+</figure>
+
+<p>The global environment is just an <code>Env</code> with no parent, pre-filled with built-ins like <code>+</code>, <code>car</code> and <code>display</code>. Every function call creates a new <code>Env</code> whose parent is... well, that's the first thing I got wrong.</p>
+
+<h2>Evaluating</h2>
+
+<p>The evaluator is the heart of the interpreter. Its job is short to state:</p>
+
+<ol>
+  <li>A <strong>symbol</strong> evaluates to whatever it is bound to.</li>
+  <li>A <strong>number or string</strong> evaluates to itself.</li>
+  <li>A <strong>list</strong> is either a <em>special form</em> (<code>if</code>, <code>define</code>, <code>lambda</code>, <code>quote</code>), which has its own rules, or a <em>function call</em>, where you evaluate every element and apply the first to the rest.</li>
+</ol>
+
+<p>Here is the core of it. Look at the <code>while (true)</code> and the two <code>continue</code> statements; we'll come back to them.</p>
+
+<figure class="code">
+  <figcaption><b>src/eval.ts</b><span>typescript</span></figcaption>
+  <pre><code data-lang="ts">export function evaluate(x: Expr, env: Env): Value {
+  while (true) {
+    if (typeof x === "symbol") return env.lookup(x);
+    if (!Array.isArray(x)) return x; // numbers and strings evaluate to themselves
+
+    const [op, ...args] = x;
+    switch (op) {
+      case S.quote:
+        return args[0];
+      case S.if: {
+        const [test, then, otherwise] = args;
+        x = evaluate(test, env) !== false ? then : otherwise;
+        continue; // tail position: loop instead of recursing
+      }
+      case S.define:
+        env.define(args[0] as symbol, evaluate(args[1], env));
+        return null;
+      case S.lambda:
+        return new Lambda(args[0] as symbol[], args[1], env);
+    }
+
+    const fn = evaluate(op, env);
+    const vals = args.map((a) =&gt; evaluate(a, env));
+    if (fn instanceof Lambda) {
+      env = fn.bind(vals); // new frame, parent is fn.env
+      x = fn.body;
+      continue;
+    }
+    return (fn as Builtin)(...vals);
+  }
+}</code></pre>
+</figure>
+
+<h3>Mistake one: dynamic scope by accident</h3>
+
+<p>My first version of the function call looked like this:</p>
+
+<figure class="code">
+  <figcaption><b>src/eval.ts</b> <span>diff</span></figcaption>
+  <pre><code data-lang="ts">// v1, wrong: the new frame's parent is whoever *called* the function
+env = new Env(env);
+
+// v2, right: the parent is wherever the function was *defined*
+env = new Env(fn.env);</code></pre>
+</figure>
+
+<p>Version one passed all my early tests, because in small programs the caller and the definer are usually the same environment: the global one. It broke the moment I wrote a function that returns a function. The inner function looked up its variables in whatever scope happened to call it, not the scope it was created in. That is <strong>dynamic scope</strong>, and it is what early Lisps actually did, so at least I was historically accurate.</p>
+
+<div class="callout">
+  <p><span class="tag">note</span> &nbsp;The fix is a single word, but understanding it took me an hour of print statements. A closure is nothing more than a function plus a pointer to the environment it was created in. Once you see that, <code>lambda</code> returning <code>new Lambda(params, body, env)</code> reads as the definition of the word.</p>
+</div>
+
+<p>Here is what the environments look like after running a counter example. Each call to <code>(c)</code> gets a fresh, empty frame, but its parent is the <code>let</code> frame that holds <code>n</code>, so <code>n</code> survives between calls.</p>
+
+<figure class="fig">
+  <div class="frame">
+    <svg class="dg" viewBox="0 0 820 360" role="img" aria-labelledby="fig3t">
+      <title id="fig3t">Environment diagram: a call frame points to a let frame holding n, which points to the global frame. The global c is bound to a closure whose env is the let frame.</title>
+      <defs>
+        <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+        <marker id="ar2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah a"/></marker>
+      </defs>
+
+      <rect class="box" x="40" y="20" width="320" height="112" rx="4"/>
+      <text class="hd" x="56" y="42">global</text>
+      <line class="sep" x1="40" y1="52" x2="360" y2="52"/>
+      <text x="56" y="74">+ - * = car …</text><text class="lbl" x="250" y="74">builtins</text>
+      <text x="56" y="96">make-counter</text><text class="lbl" x="250" y="96">λ</text>
+      <text x="56" y="118">c</text><circle class="dot" cx="340" cy="114" r="4"/>
+
+      <rect class="box hot" x="40" y="180" width="320" height="64" rx="4"/>
+      <text class="hd" x="56" y="202">let frame</text>
+      <line class="sep" x1="40" y1="212" x2="360" y2="212"/>
+      <text x="56" y="234">n</text><text class="gr" x="250" y="234">2</text>
+
+      <rect class="box dash" x="40" y="290" width="320" height="54" rx="4"/>
+      <text class="hd" x="56" y="312">call frame  (c)</text>
+      <text class="lbl" x="56" y="334">no parameters, nothing defined</text>
+
+      <rect class="box" x="480" y="160" width="300" height="100" rx="4"/>
+      <text class="hd" x="496" y="182">closure  λ()</text>
+      <line class="sep" x1="480" y1="192" x2="780" y2="192"/>
+      <text x="496" y="214">body</text><text class="lbl" x="560" y="214">(set! n (+ n 1)) n</text>
+      <text x="496" y="240">env</text><circle class="dot" cx="544" cy="236" r="4"/>
+
+      <line class="wire" x1="200" y1="178" x2="200" y2="136" marker-end="url(#ar2)"/>
+      <text class="lbl" x="210" y="161">parent</text>
+      <line class="wire" x1="200" y1="288" x2="200" y2="248" marker-end="url(#ar2)"/>
+      <text class="lbl" x="210" y="271">parent</text>
+
+      <path class="wire a" d="M344 114 C 420 114, 440 150, 476 172" marker-end="url(#ar2a)"/>
+      <text class="lbl" x="420" y="108">value</text>
+      <path class="wire a" d="M541 239 C 510 270, 420 256, 364 220" marker-end="url(#ar2a)"/>
+      <text class="lbl" x="440" y="278">env</text>
+
+      <text class="lbl" x="480" y="306">every (c) gets a new call frame,</text>
+      <text class="lbl" x="480" y="326">but n lives on in the let frame</text>
+    </svg>
+  </div>
+  <figcaption><b>fig. 3</b> &mdash; Arrows point to parents. Solid blue arrows are the ones that make closures work.</figcaption>
+</figure>
+
+<h3>Mistake two: closures that captured too early</h3>
+
+<p>The second bug was subtler. To "capture" the environment, my first <code>Lambda</code> constructor made a <em>copy</em> of it. That seemed safe: nobody could change the captured variables from outside. But it meant a recursive function couldn't see itself. <code>(define (fact n) ...)</code> creates the lambda <em>before</em> binding <code>fact</code>, so the copy was taken one step too soon.</p>
+
+<p>Holding a reference instead of a copy fixed recursion, and it is also what makes <code>set!</code> inside a closure behave the way you expect. Sharing is the point.</p>
+
+<h2>Tail calls, or how to loop without loops</h2>
+
+<p>Lisp has no <code>for</code> or <code>while</code>. You loop by having a function call itself. A naive evaluator turns every one of those calls into a JavaScript call, and Node's stack runs out after about ten thousand levels:</p>
+
+<figure class="code">
+  <figcaption><b>terminal</b><span>shell</span></figcaption>
+  <pre><code data-lang="console">$ npx tsx src/repl.ts
+λ (define (loop i) (if (= i 0) "done" (loop (- i 1))))
+λ (loop 100000)
+RangeError: Maximum call stack size exceeded</code></pre>
+</figure>
+
+<p>The fix is the <code>while (true)</code> in <code>evaluate</code>. When the last thing a function does is call another function (a <em>tail call</em>), there is nothing left to do in the current frame. So instead of recursing, the evaluator swaps in the new expression and environment and goes round the loop again. The JavaScript stack stays flat no matter how deep the Lisp recursion goes.</p>
+
+<p>Only two places are in tail position in this little language:</p>
+
+<ul>
+  <li>the chosen branch of an <code>if</code>, and</li>
+  <li>the body of a function being called.</li>
+</ul>
+
+<p>Those are exactly the two <code>continue</code> statements. Everything else, like evaluating arguments, still recurses normally, which is fine because argument lists are never deep.</p>
+
+<blockquote>
+  <p>A tail call is a goto with arguments.</p>
+  <cite>&mdash; paraphrasing Guy Steele, "Lambda: The Ultimate GOTO" (1977)</cite>
+</blockquote>
+
+<h2>The REPL</h2>
+
+<p>The last file ties it together: read a line, evaluate it in the global environment, print the result, repeat. Errors are caught and printed so a typo doesn't kill the session.</p>
+
+<figure class="code">
+  <figcaption><b>src/repl.ts</b><span>typescript</span></figcaption>
+  <pre><code data-lang="ts">import * as readline from "node:readline";
+
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: "λ " });
+
+rl.prompt();
+rl.on("line", (line) =&gt; {
+  try {
+    const value = evaluate(read(tokenize(line)), globalEnv);
+    if (value !== null) console.log(show(value));
+  } catch (err) {
+    console.error(`error: ${(err as Error).message}`);
+  }
+  rl.prompt();
+});</code></pre>
+</figure>
+
+<p>And here it is running the counter from fig. 3, plus the loop that used to crash:</p>
+
+<figure class="code">
+  <figcaption><b>terminal</b><span>lisp</span></figcaption>
+  <pre><code data-lang="lisp">λ (define (make-counter)
+    (let ((n 0))
+      (lambda () (set! n (+ n 1)) n)))
+λ (define c (make-counter))
+λ (c)
+1
+λ (c)
+2
+λ (loop 1000000) ; a million deep, flat stack
+"done"</code></pre>
+</figure>
+
+<h2>Where the four hundred lines went</h2>
+
+<p>I was surprised by the split. The parts I had worried about were small, and the part I thought would be trivial, the built-ins, took the most room.</p>
+
+<div class="tbl">
+  <table>
+    <thead><tr><th>file</th><th class="num">lines</th><th>what it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>reader.ts</code></td><td class="num">74</td><td>tokenize, read, atoms, printing values back out</td></tr>
+      <tr><td><code>env.ts</code></td><td class="num">31</td><td>scope chain</td></tr>
+      <tr><td><code>eval.ts</code></td><td class="num">168</td><td>special forms, <code>let</code> and <code>set!</code>, tail calls</td></tr>
+      <tr><td><code>builtins.ts</code></td><td class="num">92</td><td>arithmetic, lists, comparisons, <code>display</code></td></tr>
+      <tr><td><code>repl.ts</code></td><td class="num">35</td><td>the loop, history, error output</td></tr>
+    </tbody>
+    <tfoot><tr><td>total</td><td class="num">400</td><td></td></tr></tfoot>
+  </table>
+</div>
+
+<h2>What I'd do next</h2>
+
+<p>There's a long list, but three things stand out:</p>
+
+<ol>
+  <li><strong>Proper strings.</strong> The space-padding tokenizer has to go. A small hand-written scanner is maybe forty more lines.</li>
+  <li><strong>Macros.</strong> Since code is already data, <code>defmacro</code> is mostly "evaluate the body, then evaluate what it returns". I want to see how far that gets before hygiene becomes a problem.</li>
+  <li><strong>Better errors.</strong> Right now an error tells you <em>what</em> went wrong but not <em>where</em>. Keeping line numbers on tokens would fix that.</li>
+</ol>
+
+<hr>
+
+<p>The biggest lesson wasn't about Lisp. It was that "I understand how this works" and "I can build this" are very different claims, and the gap between them is where the learning is. If you've never written an interpreter, I can't recommend a weekend of it enough.<sup>1</sup> Pick the smallest language you can find and make it run.</p>
+
+<div class="notes">
+  <ol>
+    <li>Peter Norvig's essay <a href="https://norvig.com/lispy.html">"(How to Write a (Lisp) Interpreter (in Python))"</a> is the classic starting point, and much of the structure here follows it.</li>
+  </ol>
+</div>

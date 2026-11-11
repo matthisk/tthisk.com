@@ -12,7 +12,8 @@
   Design 10: a terminal window running a tmux-style session.
   One "window" is visible at a time; the status line at the bottom
   switches between them (click, 0-3, or Ctrl-b n/p). Each window is the
-  output of a command. Without JavaScript every window is shown in order.
+  output of a command. All the text comes from content.json (and posts/*.html),
+  loaded at startup, so the page needs JavaScript and an HTTP server.
 -->
 <script>document.documentElement.className = "js";</script>
 <style>
@@ -128,6 +129,7 @@
   .intro p:first-child { color: var(--bright); }
   .cow { margin: 0; font: inherit; line-height: 1.3; cursor: pointer; color: var(--fg); white-space: pre; overflow-x: auto; }
   .cow:hover .moo { color: var(--green); }
+  .avatar { display: block; width: 24ch; max-width: 100%; height: auto; image-rendering: pixelated; }
   .recent { list-style: none; margin: 0; padding: 0; }
   .recent li { display: grid; grid-template-columns: 8ch 1fr; column-gap: 1.5ch; }
   .recent time { color: var(--dim); }
@@ -286,6 +288,11 @@
   .tree .node:not(.last) .body { border-left: 1px solid var(--faint); margin-left: .45ch; padding-left: 3.55ch; }
   .tree pre { font: inherit; font-size: .9em; line-height: 1.35; margin: .7em 0 0; color: var(--fg); overflow-x: auto; }
   .tree .sum { color: var(--dim); }
+  .tree .body p { margin: 0 0 .6em; }
+  .tree .body p:last-child { margin-bottom: 0; }
+  .tree .grp > .body { max-width: none; padding-bottom: .4em; }
+  .tree .note { color: var(--dim); margin-left: 2ch; }
+  .tree .dir { color: var(--bright); }
 
   /* about */
   .prose { max-width: 70ch; }
@@ -376,7 +383,7 @@
 <div class="term" id="term">
   <div class="titlebar" aria-hidden="true">
     <div class="dots"><i></i><i></i><i></i></div>
-    <div class="t">matthis@tthisk: ~ &mdash; tmux</div>
+    <div class="t">m@tthisk: ~ &mdash; tmux</div>
   </div>
 
   <main class="screen" id="screen" tabindex="-1">
@@ -386,7 +393,7 @@
       <div class="split">
         <div class="pane">
           <div class="block">
-            <p class="line"><span class="ps1"><b>matthis@tthisk</b>:<em>~</em>$ </span><span class="cmd">fetch</span></p>
+            <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">fetch</span></p>
             <div class="out">
               <div class="fetch">
 <pre class="logo" aria-hidden="true">__
@@ -396,15 +403,9 @@
 /_/  ____
     |____|</pre>
                 <div>
-                  <dl class="kv">
+                  <dl class="kv" id="fetch-kv">
                     <dt class="hi" style="grid-column:1/-1;color:var(--bright)">matthis<span class="dim">@</span>tthisk.com</dt>
                     <dd class="sep" aria-hidden="true">────────────────────</dd>
-                    <dt>role</dt><dd>software engineer</dd>
-                    <dt>langs</dt><dd>Rust, TypeScript, Go</dd>
-                    <dt>editor</dt><dd>neovim, mostly</dd>
-                    <dt>shell</dt><dd>zsh + too many aliases</dd>
-                    <dt>uptime</dt><dd id="uptime">since 2012</dd>
-                    <dt>contact</dt><dd><a href="mailto:webmaster@tthisk.com">webmaster@tthisk.com</a></dd>
                   </dl>
                   <div class="swatch" aria-hidden="true">
                     <i style="background:#414868"></i><i style="background:#f7768e"></i><i style="background:#9ece6a"></i><i style="background:#e0af68"></i><i style="background:#7aa2f7"></i><i style="background:#bb9af7"></i><i style="background:#7dcfff"></i><i style="background:#c0caf5"></i>
@@ -412,7 +413,7 @@
                 </div>
               </div>
               <div class="intro">
-                <p>I write about systems, tooling, and the craft of making things for computers.</p>
+                <p id="intro"></p>
                 <p class="dim">This is a terminal-flavoured home page. Use the status line at the bottom
                 to move between windows, or press <kbd>0</kbd>&ndash;<kbd>3</kbd>.</p>
               </div>
@@ -422,28 +423,24 @@
 
         <div class="pane">
           <div class="block">
-            <p class="line"><span class="ps1"><b>matthis@tthisk</b>:<em>~</em>$ </span><span class="cmd">ls -t blog/ | head -3</span></p>
+            <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">ls -t blog/ | head -3</span></p>
             <div class="out">
-              <ul class="recent">
-                <li><time datetime="2026-10-28">Oct 28</time><a href="#blog/0">Writing a tiny Lisp in a weekend</a></li>
-                <li><time datetime="2026-09-14">Sep 14</time><a href="#blog/1">In defence of boring technology</a></li>
-                <li><time datetime="2026-08-02">Aug 02</time><a href="#blog/2">CRDTs explained without the math</a></li>
-              </ul>
+              <ul class="recent" id="recent"></ul>
             </div>
           </div>
           <div class="block">
-            <p class="line"><span class="ps1"><b>matthis@tthisk</b>:<em>~</em>$ </span><span class="cmd">fortune | cowsay</span></p>
+            <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">fortune | cowsay</span></p>
             <div class="out">
-              <pre class="cow" id="cow" title="moo" role="button" tabindex="0" aria-label="A cow saying a random quote. Activate for another one.">< Simplicity is prerequisite for reliability. >
- ---------------------------------------------
-        \   ^__^
-         \  (oo)\_______
-            (__)\       )\/\
-                ||----w |
-                ||     ||</pre>
+              <pre class="cow" id="cow" title="moo" role="button" tabindex="0" aria-label="A cow saying a random quote. Activate for another one."></pre>
             </div>
           </div>
-          <p class="line"><span class="ps1"><b>matthis@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
+          <div class="block">
+            <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">chafa img/pixel-profile.png</span></p>
+            <div class="out">
+              <img class="avatar" src="img/pixel-profile.png" width="640" height="864" alt="Pixel-art portrait of Matthis in blue and cream">
+            </div>
+          </div>
+          <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
           <p class="hint">keys: <kbd>0</kbd>-<kbd>3</kbd> windows &middot; <kbd>ctrl</kbd>+<kbd>b</kbd> <kbd>?</kbd> help</p>
         </div>
       </div>
@@ -453,584 +450,54 @@
     <section class="win" id="w-blog" data-win="1" aria-label="Blog">
       <div id="blog-list">
         <div class="block">
-          <p class="line"><span class="ps1"><b>matthis@tthisk</b>:<em>~</em>$ </span><span class="cmd" id="ls-cmd">ls -lt blog/</span></p>
+          <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd" id="ls-cmd">ls -lt blog/</span></p>
           <div class="out">
             <div class="ls" id="ls">
               <div class="total" id="ls-total">total 48</div>
-              <div class="row dot"><span class="perm">drwxr-xr-x</span><span class="size">4.0K</span><span class="date">Nov 10</span><a href="https://github.com/matthisk" title="you found the dotfiles">.dotfiles/</a><span class="d"># shh. 1,204 aliases and counting</span></div>
+              <div class="row dot"><span class="perm">drwxr-xr-x</span><span class="size">4.0K</span><span class="date">Nov 10</span><a href="https://github.com/matthisk/nix" title="you found the dotfiles">.dotfiles/</a><span class="d"># shh. 1,204 aliases and counting</span></div>
               <div class="row dot"><span class="perm">-rw-------</span><span class="size">  42</span><span class="date">Nov 09</span><a href="#" id="drafts">.drafts.md</a><span class="d"># not ready yet</span></div>
-              <div class="row"><span class="perm">-rw-r--r--</span><span class="size"> 12K</span><span class="date">Oct 28</span><a href="#blog/0">writing-a-tiny-lisp.md</a><span class="d"># a reader, an evaluator and a REPL in ~400 lines</span></div>
-              <div class="row"><span class="perm">-rw-r--r--</span><span class="size"> 9.1K</span><span class="date">Sep 14</span><a href="#blog/1">in-defence-of-boring-tech.md</a><span class="d"># postgres, cron and one server go a long way</span></div>
-              <div class="row"><span class="perm">-rw-r--r--</span><span class="size"> 15K</span><span class="date">Aug 02</span><a href="#blog/2">crdts-without-the-math.md</a><span class="d"># sticky notes instead of lattices</span></div>
-              <div class="row"><span class="perm">-rw-r--r--</span><span class="size"> 7.4K</span><span class="date">Jun 19</span><a href="#blog/3">dotfiles-ten-years-later.md</a><span class="d"># a decade of aliases and the occasional regret</span></div>
-              <div class="row"><span class="perm">-rw-r--r--</span><span class="size"> 8.2K</span><span class="date"> 2020</span><a href="#blog/4">asynchronous-streams-and-callbacks.md</a><span class="d"># backpressure, simulated with callbacks</span></div>
+              <!-- one .row per post, built from content.json -->
             </div>
-            <p class="dim" style="margin-top:1.2em">5 posts. Older ones live in <a href="#">archive/</a>. Feeling nosy? Try <button class="flag" id="la" type="button">ls -la</button>.</p>
+            <p class="dim" style="margin-top:1.2em"><span id="post-count"></span>. Older ones live in <a href="#">archive/</a>. Feeling nosy? Try <button class="flag" id="la" type="button">ls -la</button>.</p>
           </div>
         </div>
-        <p class="line"><span class="ps1"><b>matthis@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
+        <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
       </div>
       <div id="blog-post" hidden></div>
-      <!-- Full text of post 0. Static, author-written HTML: openPost() copies it in as-is. -->
-      <template id="post-body-0">
-        <p class="lede">Last month I spent a weekend writing a Lisp interpreter in TypeScript. Not a fast one, not a complete one, but one that can define functions, close over variables and loop a million times without blowing the stack. It came out at almost exactly four hundred lines.</p>
-
-        <p>I had read about this kind of project many times and always thought I understood it. Writing it showed me I didn't, in two specific places: scoping and tail calls. This post walks through the interpreter in the order I built it and points out where I went wrong, because the wrong turns taught me more than the parts that worked first time.</p>
-
-        <p>If you want to follow along, all you need is Node and a text editor. Every snippet below is taken from the real source, trimmed a little for space.</p>
-
-        <h2>Why Lisp?</h2>
-
-        <p>Most languages spend a big chunk of their implementation on syntax. Operator precedence, statements versus expressions, semicolon rules, string interpolation: all of that has to be parsed before anything interesting happens. Lisp skips almost all of it. A program is a nested list written with parentheses, and the first element of each list says what to do with the rest.</p>
-
-        <p>That means the parser is tiny and the weekend can go on the part that is actually hard: making the program <em>run</em>. The whole pipeline looks like this:</p>
-
-        <figure class="fig">
-          <div class="frame">
-            <svg class="dg" viewBox="0 0 820 190" role="img" aria-labelledby="fig1t">
-              <title id="fig1t">The interpreter pipeline: source text is tokenized, read into an expression tree, evaluated against an environment, and the result is printed. Then it loops.</title>
-              <defs>
-                <marker id="ar1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
-                <marker id="ar1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah a"/></marker>
-              </defs>
-              <path class="wire" d="M750 48 V26 H70 V44" marker-end="url(#ar1)"/>
-              <text class="lbl" x="410" y="18" text-anchor="middle">repeat for every line you type</text>
-
-              <rect class="box" x="10"  y="50" width="120" height="50" rx="4"/>
-              <rect class="box" x="180" y="50" width="120" height="50" rx="4"/>
-              <rect class="box" x="350" y="50" width="120" height="50" rx="4"/>
-              <rect class="box hot" x="520" y="50" width="120" height="50" rx="4"/>
-              <rect class="box" x="690" y="50" width="120" height="50" rx="4"/>
-              <text x="70"  y="80" text-anchor="middle">source</text>
-              <text x="240" y="80" text-anchor="middle">tokenize</text>
-              <text x="410" y="80" text-anchor="middle">read</text>
-              <text x="580" y="80" text-anchor="middle" class="ac">eval</text>
-              <text x="750" y="80" text-anchor="middle">print</text>
-
-              <line class="wire" x1="132" y1="75" x2="176" y2="75" marker-end="url(#ar1)"/>
-              <line class="wire" x1="302" y1="75" x2="346" y2="75" marker-end="url(#ar1)"/>
-              <line class="wire" x1="472" y1="75" x2="516" y2="75" marker-end="url(#ar1)"/>
-              <line class="wire" x1="642" y1="75" x2="686" y2="75" marker-end="url(#ar1)"/>
-              <text class="lbl" x="155" y="68" text-anchor="middle">str</text>
-              <text class="lbl" x="325" y="68" text-anchor="middle">tokens</text>
-              <text class="lbl" x="495" y="68" text-anchor="middle">Expr</text>
-              <text class="lbl" x="665" y="68" text-anchor="middle">Value</text>
-
-              <text class="lbl gr" x="70"  y="122" text-anchor="middle">"(+ 1 2)"</text>
-              <text class="lbl" x="240" y="122" text-anchor="middle">( + 1 2 )</text>
-              <text class="lbl" x="410" y="122" text-anchor="middle">[+, 1, 2]</text>
-              <text class="lbl" x="750" y="122" text-anchor="middle">3</text>
-
-              <rect class="box" x="520" y="142" width="120" height="36" rx="4"/>
-              <text x="580" y="165" text-anchor="middle">env</text>
-              <line class="wire a" x1="580" y1="104" x2="580" y2="138" marker-start="url(#ar1a)" marker-end="url(#ar1a)"/>
-              <text class="lbl" x="594" y="126">lookup / define</text>
-            </svg>
-          </div>
-          <figcaption><b>fig. 1</b> &mdash; Four stages and a loop. Only <code>eval</code> talks to the environment.</figcaption>
-        </figure>
-
-        <p>Each box is one file. I'll go through them from left to right.</p>
-
-        <h2>Tokenizing: the postcard parser</h2>
-
-        <p>The first step turns a string into a flat list of tokens. The classic trick is to pad every parenthesis with spaces and then split on whitespace. It feels like cheating, and it is, but it works for everything except strings that contain spaces. I decided I could live without those for a weekend.</p>
-
-        <figure class="code">
-          <figcaption><b>src/reader.ts</b><span>typescript</span></figcaption>
-          <pre><code data-lang="ts">export function tokenize(src: string): string[] {
-  return src
-    .replace(/;.*$/gm, "")   // strip comments
-    .replace(/\(/g, " ( ")
-    .replace(/\)/g, " ) ")
-    .split(/\s+/)
-    .filter(Boolean);
-}</code></pre>
-        </figure>
-
-        <p>Seven lines. That is the entire lexer. For comparison, the lexer in a typical JavaScript engine is several thousand.</p>
-
-        <h2>Reading: from tokens to a tree</h2>
-
-        <p>The reader consumes tokens and builds nested arrays. When it sees an opening parenthesis, it keeps reading expressions until it hits the matching close. Anything else is an <em>atom</em>: a number, a string, or a symbol.</p>
-
-        <figure class="code">
-          <figcaption><b>src/reader.ts</b><span>typescript</span></figcaption>
-          <pre><code data-lang="ts">export type Expr = number | string | symbol | Expr[];
-
-export function read(tokens: string[]): Expr {
-  const tok = tokens.shift();
-  if (tok === undefined) throw new SyntaxError("unexpected end of input");
-
-  if (tok === "(") {
-    const list: Expr[] = [];
-    while (tokens[0] !== ")") {
-      if (tokens.length === 0) throw new SyntaxError("missing )");
-      list.push(read(tokens));
-    }
-    tokens.shift(); // drop the ")"
-    return list;
-  }
-  if (tok === ")") throw new SyntaxError("unexpected )");
-  return atom(tok);
-}
-
-function atom(tok: string): Expr {
-  const n = Number(tok);
-  if (!Number.isNaN(n)) return n;
-  if (tok.startsWith('"')) return tok.slice(1, -1);
-  return Symbol.for(tok);
-}</code></pre>
-        </figure>
-
-        <p>I used JavaScript's <code>Symbol.for</code> for Lisp symbols. It interns them for free, so two occurrences of <code>x</code> are the same value and comparing them is a pointer check. Here is what the reader produces for a small function definition:</p>
-
-        <figure class="fig">
-          <div class="frame"><pre class="ascii"><span class="a">(define (square x) (* x x))</span>
-     <span class="d">│</span>
-     <span class="d">▼  tokenize</span>
-<span class="y">(</span>  define  <span class="y">(</span>  square  x  <span class="y">)</span>  <span class="y">(</span>  *  x  x  <span class="y">)</span>  <span class="y">)</span>
-     <span class="d">│</span>
-     <span class="d">▼  read</span>
-<span class="y">list</span>
-<span class="d">├──</span> define
-<span class="d">├──</span> <span class="y">list</span>
-<span class="d">│   ├──</span> square
-<span class="d">│   └──</span> x
-<span class="d">└──</span> <span class="y">list</span>
-<span class="d">    ├──</span> *
-<span class="d">    ├──</span> x
-<span class="d">    └──</span> x</pre></div>
-          <figcaption><b>fig. 2</b> &mdash; Twelve tokens become a tree with three lists. The tree <em>is</em> the program.</figcaption>
-        </figure>
-
-        <p>This is the property people mean when they say Lisp is <em>homoiconic</em>: the program and the data structure it is stored in look the same. It is also why macros are so natural in Lisp, though I didn't get to those.</p>
-
-        <h2>Environments</h2>
-
-        <p>Before we can evaluate anything we need somewhere to keep variables. An environment is a map from symbols to values, plus a pointer to a parent environment. Looking up a name walks up the chain until it finds a match or runs out of parents.</p>
-
-        <figure class="code">
-          <figcaption><b>src/env.ts</b><span>typescript</span></figcaption>
-          <pre><code data-lang="ts">export class Env {
-  private vars = new Map&lt;symbol, Value&gt;();
-
-  constructor(private parent?: Env) {}
-
-  define(name: symbol, value: Value): void {
-    this.vars.set(name, value);
-  }
-
-  lookup(name: symbol): Value {
-    if (this.vars.has(name)) return this.vars.get(name)!;
-    if (this.parent) return this.parent.lookup(name);
-    throw new ReferenceError(`unbound symbol: ${Symbol.keyFor(name)}`);
-  }
-}</code></pre>
-        </figure>
-
-        <p>The global environment is just an <code>Env</code> with no parent, pre-filled with built-ins like <code>+</code>, <code>car</code> and <code>display</code>. Every function call creates a new <code>Env</code> whose parent is... well, that's the first thing I got wrong.</p>
-
-        <h2>Evaluating</h2>
-
-        <p>The evaluator is the heart of the interpreter. Its job is short to state:</p>
-
-        <ol>
-          <li>A <strong>symbol</strong> evaluates to whatever it is bound to.</li>
-          <li>A <strong>number or string</strong> evaluates to itself.</li>
-          <li>A <strong>list</strong> is either a <em>special form</em> (<code>if</code>, <code>define</code>, <code>lambda</code>, <code>quote</code>), which has its own rules, or a <em>function call</em>, where you evaluate every element and apply the first to the rest.</li>
-        </ol>
-
-        <p>Here is the core of it. Look at the <code>while (true)</code> and the two <code>continue</code> statements; we'll come back to them.</p>
-
-        <figure class="code">
-          <figcaption><b>src/eval.ts</b><span>typescript</span></figcaption>
-          <pre><code data-lang="ts">export function evaluate(x: Expr, env: Env): Value {
-  while (true) {
-    if (typeof x === "symbol") return env.lookup(x);
-    if (!Array.isArray(x)) return x; // numbers and strings evaluate to themselves
-
-    const [op, ...args] = x;
-    switch (op) {
-      case S.quote:
-        return args[0];
-      case S.if: {
-        const [test, then, otherwise] = args;
-        x = evaluate(test, env) !== false ? then : otherwise;
-        continue; // tail position: loop instead of recursing
-      }
-      case S.define:
-        env.define(args[0] as symbol, evaluate(args[1], env));
-        return null;
-      case S.lambda:
-        return new Lambda(args[0] as symbol[], args[1], env);
-    }
-
-    const fn = evaluate(op, env);
-    const vals = args.map((a) =&gt; evaluate(a, env));
-    if (fn instanceof Lambda) {
-      env = fn.bind(vals); // new frame, parent is fn.env
-      x = fn.body;
-      continue;
-    }
-    return (fn as Builtin)(...vals);
-  }
-}</code></pre>
-        </figure>
-
-        <h3>Mistake one: dynamic scope by accident</h3>
-
-        <p>My first version of the function call looked like this:</p>
-
-        <figure class="code">
-          <figcaption><b>src/eval.ts</b> <span>diff</span></figcaption>
-          <pre><code data-lang="ts">// v1, wrong: the new frame's parent is whoever *called* the function
-env = new Env(env);
-
-// v2, right: the parent is wherever the function was *defined*
-env = new Env(fn.env);</code></pre>
-        </figure>
-
-        <p>Version one passed all my early tests, because in small programs the caller and the definer are usually the same environment: the global one. It broke the moment I wrote a function that returns a function. The inner function looked up its variables in whatever scope happened to call it, not the scope it was created in. That is <strong>dynamic scope</strong>, and it is what early Lisps actually did, so at least I was historically accurate.</p>
-
-        <div class="callout">
-          <p><span class="tag">note</span> &nbsp;The fix is a single word, but understanding it took me an hour of print statements. A closure is nothing more than a function plus a pointer to the environment it was created in. Once you see that, <code>lambda</code> returning <code>new Lambda(params, body, env)</code> reads as the definition of the word.</p>
-        </div>
-
-        <p>Here is what the environments look like after running a counter example. Each call to <code>(c)</code> gets a fresh, empty frame, but its parent is the <code>let</code> frame that holds <code>n</code>, so <code>n</code> survives between calls.</p>
-
-        <figure class="fig">
-          <div class="frame">
-            <svg class="dg" viewBox="0 0 820 360" role="img" aria-labelledby="fig3t">
-              <title id="fig3t">Environment diagram: a call frame points to a let frame holding n, which points to the global frame. The global c is bound to a closure whose env is the let frame.</title>
-              <defs>
-                <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
-                <marker id="ar2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah a"/></marker>
-              </defs>
-
-              <rect class="box" x="40" y="20" width="320" height="112" rx="4"/>
-              <text class="hd" x="56" y="42">global</text>
-              <line class="sep" x1="40" y1="52" x2="360" y2="52"/>
-              <text x="56" y="74">+ - * = car …</text><text class="lbl" x="250" y="74">builtins</text>
-              <text x="56" y="96">make-counter</text><text class="lbl" x="250" y="96">λ</text>
-              <text x="56" y="118">c</text><circle class="dot" cx="340" cy="114" r="4"/>
-
-              <rect class="box hot" x="40" y="180" width="320" height="64" rx="4"/>
-              <text class="hd" x="56" y="202">let frame</text>
-              <line class="sep" x1="40" y1="212" x2="360" y2="212"/>
-              <text x="56" y="234">n</text><text class="gr" x="250" y="234">2</text>
-
-              <rect class="box dash" x="40" y="290" width="320" height="54" rx="4"/>
-              <text class="hd" x="56" y="312">call frame  (c)</text>
-              <text class="lbl" x="56" y="334">no parameters, nothing defined</text>
-
-              <rect class="box" x="480" y="160" width="300" height="100" rx="4"/>
-              <text class="hd" x="496" y="182">closure  λ()</text>
-              <line class="sep" x1="480" y1="192" x2="780" y2="192"/>
-              <text x="496" y="214">body</text><text class="lbl" x="560" y="214">(set! n (+ n 1)) n</text>
-              <text x="496" y="240">env</text><circle class="dot" cx="544" cy="236" r="4"/>
-
-              <line class="wire" x1="200" y1="178" x2="200" y2="136" marker-end="url(#ar2)"/>
-              <text class="lbl" x="210" y="161">parent</text>
-              <line class="wire" x1="200" y1="288" x2="200" y2="248" marker-end="url(#ar2)"/>
-              <text class="lbl" x="210" y="271">parent</text>
-
-              <path class="wire a" d="M344 114 C 420 114, 440 150, 476 172" marker-end="url(#ar2a)"/>
-              <text class="lbl" x="420" y="108">value</text>
-              <path class="wire a" d="M541 239 C 510 270, 420 256, 364 220" marker-end="url(#ar2a)"/>
-              <text class="lbl" x="440" y="278">env</text>
-
-              <text class="lbl" x="480" y="306">every (c) gets a new call frame,</text>
-              <text class="lbl" x="480" y="326">but n lives on in the let frame</text>
-            </svg>
-          </div>
-          <figcaption><b>fig. 3</b> &mdash; Arrows point to parents. Solid blue arrows are the ones that make closures work.</figcaption>
-        </figure>
-
-        <h3>Mistake two: closures that captured too early</h3>
-
-        <p>The second bug was subtler. To "capture" the environment, my first <code>Lambda</code> constructor made a <em>copy</em> of it. That seemed safe: nobody could change the captured variables from outside. But it meant a recursive function couldn't see itself. <code>(define (fact n) ...)</code> creates the lambda <em>before</em> binding <code>fact</code>, so the copy was taken one step too soon.</p>
-
-        <p>Holding a reference instead of a copy fixed recursion, and it is also what makes <code>set!</code> inside a closure behave the way you expect. Sharing is the point.</p>
-
-        <h2>Tail calls, or how to loop without loops</h2>
-
-        <p>Lisp has no <code>for</code> or <code>while</code>. You loop by having a function call itself. A naive evaluator turns every one of those calls into a JavaScript call, and Node's stack runs out after about ten thousand levels:</p>
-
-        <figure class="code">
-          <figcaption><b>terminal</b><span>shell</span></figcaption>
-          <pre><code data-lang="console">$ npx tsx src/repl.ts
-λ (define (loop i) (if (= i 0) "done" (loop (- i 1))))
-λ (loop 100000)
-RangeError: Maximum call stack size exceeded</code></pre>
-        </figure>
-
-        <p>The fix is the <code>while (true)</code> in <code>evaluate</code>. When the last thing a function does is call another function (a <em>tail call</em>), there is nothing left to do in the current frame. So instead of recursing, the evaluator swaps in the new expression and environment and goes round the loop again. The JavaScript stack stays flat no matter how deep the Lisp recursion goes.</p>
-
-        <p>Only two places are in tail position in this little language:</p>
-
-        <ul>
-          <li>the chosen branch of an <code>if</code>, and</li>
-          <li>the body of a function being called.</li>
-        </ul>
-
-        <p>Those are exactly the two <code>continue</code> statements. Everything else, like evaluating arguments, still recurses normally, which is fine because argument lists are never deep.</p>
-
-        <blockquote>
-          <p>A tail call is a goto with arguments.</p>
-          <cite>&mdash; paraphrasing Guy Steele, "Lambda: The Ultimate GOTO" (1977)</cite>
-        </blockquote>
-
-        <h2>The REPL</h2>
-
-        <p>The last file ties it together: read a line, evaluate it in the global environment, print the result, repeat. Errors are caught and printed so a typo doesn't kill the session.</p>
-
-        <figure class="code">
-          <figcaption><b>src/repl.ts</b><span>typescript</span></figcaption>
-          <pre><code data-lang="ts">import * as readline from "node:readline";
-
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: "λ " });
-
-rl.prompt();
-rl.on("line", (line) =&gt; {
-  try {
-    const value = evaluate(read(tokenize(line)), globalEnv);
-    if (value !== null) console.log(show(value));
-  } catch (err) {
-    console.error(`error: ${(err as Error).message}`);
-  }
-  rl.prompt();
-});</code></pre>
-        </figure>
-
-        <p>And here it is running the counter from fig. 3, plus the loop that used to crash:</p>
-
-        <figure class="code">
-          <figcaption><b>terminal</b><span>lisp</span></figcaption>
-          <pre><code data-lang="lisp">λ (define (make-counter)
-    (let ((n 0))
-      (lambda () (set! n (+ n 1)) n)))
-λ (define c (make-counter))
-λ (c)
-1
-λ (c)
-2
-λ (loop 1000000) ; a million deep, flat stack
-"done"</code></pre>
-        </figure>
-
-        <h2>Where the four hundred lines went</h2>
-
-        <p>I was surprised by the split. The parts I had worried about were small, and the part I thought would be trivial, the built-ins, took the most room.</p>
-
-        <div class="tbl">
-          <table>
-            <thead><tr><th>file</th><th class="num">lines</th><th>what it does</th></tr></thead>
-            <tbody>
-              <tr><td><code>reader.ts</code></td><td class="num">74</td><td>tokenize, read, atoms, printing values back out</td></tr>
-              <tr><td><code>env.ts</code></td><td class="num">31</td><td>scope chain</td></tr>
-              <tr><td><code>eval.ts</code></td><td class="num">168</td><td>special forms, <code>let</code> and <code>set!</code>, tail calls</td></tr>
-              <tr><td><code>builtins.ts</code></td><td class="num">92</td><td>arithmetic, lists, comparisons, <code>display</code></td></tr>
-              <tr><td><code>repl.ts</code></td><td class="num">35</td><td>the loop, history, error output</td></tr>
-            </tbody>
-            <tfoot><tr><td>total</td><td class="num">400</td><td></td></tr></tfoot>
-          </table>
-        </div>
-
-        <h2>What I'd do next</h2>
-
-        <p>There's a long list, but three things stand out:</p>
-
-        <ol>
-          <li><strong>Proper strings.</strong> The space-padding tokenizer has to go. A small hand-written scanner is maybe forty more lines.</li>
-          <li><strong>Macros.</strong> Since code is already data, <code>defmacro</code> is mostly "evaluate the body, then evaluate what it returns". I want to see how far that gets before hygiene becomes a problem.</li>
-          <li><strong>Better errors.</strong> Right now an error tells you <em>what</em> went wrong but not <em>where</em>. Keeping line numbers on tokens would fix that.</li>
-        </ol>
-
-        <hr>
-
-        <p>The biggest lesson wasn't about Lisp. It was that "I understand how this works" and "I can build this" are very different claims, and the gap between them is where the learning is. If you've never written an interpreter, I can't recommend a weekend of it enough.<sup>1</sup> Pick the smallest language you can find and make it run.</p>
-
-        <div class="notes">
-          <ol>
-            <li>Peter Norvig's essay <a href="https://norvig.com/lispy.html">"(How to Write a (Lisp) Interpreter (in Python))"</a> is the classic starting point, and much of the structure here follows it.</li>
-          </ol>
-        </div>
-      </template>
-      <!-- Full text of post 4, imported from the old matthisk.com (Ghost, 1 May 2020). Images in img/. -->
-      <template id="post-body-4">
-        <p class="lede">Asynchronous streaming solutions, such as Rx or Reactor, rely on callbacks to perform flow control (or backpressure). Without flow control, systems could overflow and eventually crash. What is the difference between flow control in synchronous applications and their asynchronous counterparts?</p>
-
-        <h2>Understanding backpressure</h2>
-
-        <p>A stream consists of a chain of <em>publishers</em> and <em>subscribers</em>. A publisher produces new values and the subscriber consumes them. In between the two sits a <em>buffer</em> that can hold values until the consumer is ready to consume them. The following image illustrates a chain of a single publisher and subscriber:</p>
-
-        <figure class="fig img small">
-          <div class="frame"><img src="img/backpressure-1-single.png" width="540" height="150" alt="A publisher P, a buffer and a subscriber S in a row, running sequentially on one thread."></div>
-          <figcaption><b>fig. 1</b> &mdash; Synchronous publisher and subscriber running sequentially.</figcaption>
-        </figure>
-
-        <p>If the publisher and subscriber operate concurrently, the publisher could overflow the buffer. This happens when the publisher is emitting items faster than the subscriber can consume them. Throttling the publisher to avoid overflowing the subscriber is what we call backpressure.</p>
-
-        <p>If the publisher and subscriber are synchronous; we could block the producer when the buffer is about to overflow. The Java standard library ships with a Queue implementation for this called a <a href="https://docs.oracle.com/javase/7/docs/api/java/util/concurrent/BlockingQueue.html" rel="noreferrer nofollow noopener">blocking queue</a>. This queue will block the thread performing a put operation on a full queue and unblock the producer once an item is taken from the queue.</p>
-
-        <div class="callout">
-          <p><span class="tag">Note on blocking.</span> What does it mean for the put operation to block? It means that the thread on which this operation runs will be parked, freeing up the CPU on which it was running. The operating system will schedule one or more threads to run in the meantime. When the subscriber takes an element from the queue, the producer&rsquo;s thread will be unparked and execution of the producer will continue.</p>
-        </div>
-
-        <p>By parking the producer&rsquo;s thread, the blocking queue makes it impossible for the producer to outpace the subscriber. Since the producer will not be granted CPU time until more space becomes available in the queue.</p>
-
-        <figure class="fig img">
-          <div class="frame"><img src="img/backpressure-2-threads.png" width="653" height="312" alt="Publisher and subscriber on separate threads, connected by a blocking queue."></div>
-          <figcaption><b>fig. 2</b> &mdash; Synchronous publisher and subscriber running on separate threads.</figcaption>
-        </figure>
-
-        <p>Synchronous streams can block the threads on which producers and subscribers execute, as such they can rely on a <code>BlockingQueue</code> to guarantee backpressure. But what if we wanted to implement a stream that operates asynchronously, such streams are not allowed to block the threads upon which the producer and subscriber execute. Because they are non-blocking, they cannot rely on a <code>BlockingQueue</code> to prevent the buffer from overflowing.</p>
-
-        <figure class="fig img">
-          <div class="frame"><img src="img/backpressure-3-async.png" width="653" height="391" alt="Asynchronous publisher and subscriber on separate threads, with no blocking between them."></div>
-          <figcaption><b>fig. 3</b> &mdash; Asynchronous publisher and subscriber on separate threads.</figcaption>
-        </figure>
-
-        <p>Because asynchronous code cannot rely on a <code>BlockingQueue</code>, flow control needs to be simulated through an asynchronous concurrency primitive. In the Java runtime the only primitive available to write asynchronous code is the <em>callback</em>; how can we use callbacks to throttle a producer?</p>
-
-        <div class="callout">
-          <p><span class="tag">Note on asynchronous primitives and promises.</span> Futures or Promises also rely on callbacks, you create them by supplying a callback that will be invoked once the operation completes. Futures help with composing multiple asynchronous tasks but underneath there is no other <em>concurrency primitive</em>.</p>
-        </div>
-
-        <h2>Simulating flow control</h2>
-
-        <p>Let&rsquo;s take a look at part of the reactive streams specification, to understand how it uses callbacks to simulate flow control. In a reactive stream the publisher uses a callback on the subscriber to send elements:</p>
-
-        <figure class="code">
-          <figcaption><b>Subscriber.java</b><span>java &middot; simplified</span></figcaption>
-          <pre><code data-lang="java">public interface Subscriber&lt;T&gt; {
-    public void onNext(T t);
-}</code></pre>
-        </figure>
-
-        <p>Since the subscriber could be operating on concurrently from the producer, the single callback cannot guarantee flow control. So, a reactive stream introduces a second callback, not from publisher to subscriber but from subscriber to publisher. This callback is part of the subscription a subscriber has to a producer. On this subscription backpressure is <em>simulated</em> by allowing the subscriber to communicate the number of items it can handle:</p>
-
-        <figure class="code">
-          <figcaption><b>Subscription.java</b><span>java &middot; simplified</span></figcaption>
-          <pre><code data-lang="java">public interface Subscription {
-    public void request(long n);
-}</code></pre>
-        </figure>
-
-        <figure class="fig img">
-          <div class="frame"><img src="img/backpressure-4-callbacks.png" width="1307" height="625" alt="Publisher P calls onNext on subscriber S; S calls request back on P."></div>
-          <figcaption><b>fig. 4</b> &mdash; Callback based publisher and subscriber.</figcaption>
-        </figure>
-
-        <p>This second callback allows a reactive stream to <em>simulate</em> flow control without blocking underlying threads. Where a blocking implementation guarantees that a publisher could not overflow a subscriber, because the operating system can park the producer&rsquo;s thread, the non-blocking variant has no such guarantee. A publisher does not have to adhere to the limits supplied by the subscriber through the request callback.</p>
-
-        <h2>Implications for operators</h2>
-
-        <p>An operator (e.g. <code>map</code>) is both a subscriber, because it receives items from the upstream, and a publisher because it produces items for the downstream. Operators are used to alter the stream by reacting to items passing through it. Because an operator is a publisher it needs to account for backpressure from the downstream <a href="https://github.com/ReactiveX/RxJava/wiki/Writing-operators-for-2.0#backpressure-and-cancellation" rel="noreferrer nofollow noopener">inside its implementation</a>.</p>
-
-        <p>Accounting for backpressure in the implementation of an operator means that the implementer of an operator is responsible for adhering to the flow control contract. It is not allowed to send more items to the downstream than are requested. And the operator needs to ensure it requests enough items from the upstream; as to not stall the stream.</p>
-
-        <p>To demonstrate how a stream could stall we can look at the <a href="https://github.com/ReactiveX/RxJava/wiki/Writing-operators-for-2.0#replenishing" rel="noreferrer nofollow noopener">filter operator</a> from the Rx docs. Because a filter operator does not emit all elements it receives, it needs to request additional items from the upstream for each ignored element:</p>
-
-        <figure class="code">
-          <figcaption><b>FilterOperator.java</b><span>java &middot; simplified</span></figcaption>
-          <pre><code data-lang="java">public void onNext(Integer item) {
-    if (item % 2 != 0) {
-       downstream.onNext(item);
-    } else {
-       // If we forget to request an additional item, our stream will stall
-       upstream.request(1);
-    }
-}</code></pre>
-        </figure>
-
-        <p>The synchronization required to account for backpressure in an asynchronous stream becomes more apparent when implementing a <a href="https://github.com/ReactiveX/RxJava/wiki/Writing-operators-for-2.0#stable-prefetching" rel="noreferrer nofollow noopener">buffer operator</a>. Here a drain method simulates flow control together with the concern of cancellation, error handling, and completion. Where a <code>BlockingQueue</code> of a synchronous stream would provide this pattern without additional synchronization. The asynchronous variant requires complex orchestration.</p>
-
-        <h2>Conclusion</h2>
-
-        <p>Streams require flow control to prevent a publisher from overflowing a subscriber. Where synchronous streams can rely on primitives such as a <code>BlockingQueue</code> to provide this flow control, asynchronous streams need to rely on <em>callbacks</em> to <em>simulate</em> backpressure. This creates a complex contract between a publisher and subscriber, making implementation and usage of asynchronous streams harder and more error prone than their synchronous counterparts. This is not to say asynchronous streams are <em>bad</em>. But it is to demonstrate that while useful, asynchronous streams are build on top of a complex abstraction, namely that of simulating flow control with callbacks. What if we could build asynchronous streams on top of an asynchronous blocking queue, this would combine the best of both worlds.</p>
-
-        <hr>
-
-        <p class="dim"><em>This is part 1 in a multi part series on asynchronous streaming.</em></p>
-        <ol class="series">
-          <li class="here">Asynchronous streams and callbacks</li>
-          <li>Asynchronous streams and coroutines</li>
-          <li>Asynchronous streams and Kotlin</li>
-        </ol>
-      </template>
     </section>
 
     <!-- 2: projects -->
     <section class="win" id="w-projects" data-win="2" aria-label="Projects">
       <div class="block">
-        <p class="line"><span class="ps1"><b>matthis@tthisk</b>:<em>~</em>$ </span><span class="cmd">tree -L 1 projects/</span></p>
+        <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">tree -L 2 projects/</span></p>
         <div class="out tree">
           <div class="blu">projects/</div>
-          <div class="node">
-            <span class="br">├── </span><a href="#">kvlite/</a><span class="tag">rust</span>
-            <div class="body">An embeddable key-value store built on a log-structured merge tree.
-            Written to understand how storage engines really work.</div>
-          </div>
-          <div class="node">
-            <span class="br">├── </span><a href="#">termplot/</a><span class="tag">go</span>
-            <div class="body">Charts in the terminal, drawn with Braille characters. Pipe numbers in, get a plot out.
-<pre aria-label="Example termplot output: a sine wave"><span class="dim">$</span> seq 1 20 | awk '{print sin($1/3)}' | termplot
- 1 |  ⢀⡠⠤⢄          ⡠⠤⢄⡀
-   | ⡔⠁   ⠑⡄       ⡔⠁   ⠈⢢
- 0 |⠎      ⠘⡄    ⢠⠃      ⠱
-   |        ⠈⢆  ⡰⠁
--1 |          ⠑⠊</pre></div>
-          </div>
-          <div class="node last">
-            <span class="br">└── </span><a href="#">tthisk.com/</a><span class="tag">html</span>
-            <div class="body">This site. One file, written by hand, running inside a pretend tmux session.</div>
-          </div>
-          <div class="sum">3 directories, 0 regrets</div>
+          <div id="tree"></div>
+          <div class="sum" id="tree-sum"></div>
         </div>
       </div>
-      <p class="line"><span class="ps1"><b>matthis@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
+      <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
     </section>
 
     <!-- 3: about -->
     <section class="win" id="w-about" data-win="3" aria-label="About">
       <div class="block">
-        <p class="line"><span class="ps1"><b>matthis@tthisk</b>:<em>~</em>$ </span><span class="cmd">cat about.txt</span></p>
-        <div class="out prose">
-          <p>I'm a software engineer. I like small, sharp tools, fast feedback loops, and code that is
-          pleasant to read a year after it was written.</p>
-          <p>When I'm not building products I'm usually building tools nobody asked for, or writing
-          about why I built them.</p>
+        <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">cat about.txt</span></p>
+        <div class="out prose" id="about-text"></div>
+      </div>
+      <div class="block">
+        <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">cat ~/.config/me.toml</span></p>
+        <div class="out">
+<pre class="toml" id="toml"></pre>
         </div>
       </div>
       <div class="block">
-        <p class="line"><span class="ps1"><b>matthis@tthisk</b>:<em>~</em>$ </span><span class="cmd">cat ~/.config/me.toml</span></p>
+        <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">git log --oneline -5 -- life/</span></p>
         <div class="out">
-<pre class="toml"><span class="h">[work]</span>
-<span class="k">role</span>      = <span class="s">"software engineer"</span>
-<span class="k">languages</span> = [<span class="s">"rust"</span>, <span class="s">"typescript"</span>, <span class="s">"go"</span>]
-
-<span class="h">[now]</span>
-<span class="k">reading</span>   = <span class="s">"about storage engines"</span>
-<span class="k">editor</span>    = <span class="s">"whichever one is open"</span>
-
-<span class="h">[contact]</span>
-<span class="k">email</span>     = <span class="s">"<a href="mailto:webmaster@tthisk.com">webmaster@tthisk.com</a>"</span>
-<span class="k">github</span>    = <span class="s">"<a href="https://github.com/matthisk">github.com/matthisk</a>"</span></pre>
+<pre class="log" id="log"></pre>
         </div>
       </div>
-      <div class="block">
-        <p class="line"><span class="ps1"><b>matthis@tthisk</b>:<em>~</em>$ </span><span class="cmd">git log --oneline -5 -- life/</span></p>
-        <div class="out">
-<pre class="log"><span class="sha">a3f9c21</span> <span class="ref">(HEAD -&gt; main)</span> start writing again
-<span class="sha">7be0d14</span> ship kvlite v0.3
-<span class="sha">19c4e8a</span> learn rust properly this time
-<span class="sha">e02d7b5</span> switch to a bigger monitor, fewer splits
-<span class="sha">0000001</span> initial commit</pre>
-        </div>
-      </div>
-      <p class="line"><span class="ps1"><b>matthis@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
+      <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
     </section>
 
   </main>
@@ -1075,34 +542,93 @@ rl.on("line", (line) =&gt; {
   "use strict";
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var NAMES = ["home", "blog", "projects", "about"];
-  var POSTS = [
-    { slug: "writing-a-tiny-lisp.md", title: "Writing a tiny Lisp in a weekend", date: "2026-10-28", read: "11 min",
-      body: ["A reader, an evaluator and a REPL in about four hundred lines. Lisp is the rare language where the parser fits on a postcard, so most of the weekend goes into the interesting part: environments, closures and tail calls.",
-             "This post walks through each piece in the order I wrote it, including the two places where I got scoping wrong."] },
-    { slug: "in-defence-of-boring-tech.md", title: "In defence of boring technology", date: "2026-09-14", read: "5 min",
-      body: ["Postgres, cron and one server will take you further than you think. Boring tools have known failure modes, good documentation and answers on the first page of search results.",
-             "Spend your novelty budget on the part of the product that is actually new."] },
-    { slug: "crdts-without-the-math.md", title: "CRDTs explained without the math", date: "2026-08-02", read: "9 min",
-      body: ["How do collaborative editors stay in sync when everyone types at once? With data structures that can always be merged, in any order, and end up the same.",
-             "We will build one out of sticky notes instead of lattices."] },
-    { slug: "dotfiles-ten-years-later.md", title: "My dotfiles, ten years later", date: "2026-06-19", read: "4 min",
-      body: ["A decade of aliases and the occasional regret. Some of these files are older than my laptop, and a few are older than the tools they configure.",
-             "Here is what survived, what I deleted, and the one alias I type more than my own name."] },
-    { slug: "asynchronous-streams-and-callbacks.md", title: "Asynchronous streams and callbacks", date: "2020-05-01", read: "5 min",
-      body: ["How asynchronous streams simulate backpressure with callbacks."] }
-  ];
-  var FORTUNES = [
-    "Simplicity is prerequisite for reliability. -- Dijkstra",
-    "Make it work, make it right, make it fast. -- Kent Beck",
-    "There are only two hard things: cache invalidation, naming things, and off-by-one errors.",
-    "Premature optimization is the root of all evil. -- Knuth",
-    "It works on my machine.",
-    "Programs must be written for people to read, and only incidentally for machines to execute. -- Abelson & Sussman",
-    "The best code is no code at all.",
-    "Have you tried turning it off and on again?",
-    "Weeks of coding can save you hours of planning.",
-    "Deleted code is debugged code. -- Jeff Sickel"
-  ];
+  // All site text lives in content.json; render() fills the page from it at startup.
+  var POSTS = [], FORTUNES = [];
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  function parseDate(s) { var p = String(s).split("-"); return new Date(+p[0], +p[1] - 1, +p[2] || 1); }
+  // ls-style: "Oct 28" for the last six months, the year for anything older
+  function lsDate(s) {
+    var d = parseDate(s);
+    if (Math.abs(new Date() - d) > 182 * 864e5) return String(d.getFullYear());
+    return MONTHS[d.getMonth()] + " " + String(d.getDate()).padStart(2, "0");
+  }
+  function link(text, href) { return '<a href="' + esc(href || "#") + '">' + esc(text) + "</a>"; }
+  function postLink(p, text) { return '<a href="#blog/' + p.index + '">' + esc(text) + "</a>"; }
+
+  function uptime(since, suffix) {
+    var start = parseDate(since), now = new Date();
+    var years = now.getFullYear() - start.getFullYear();
+    var anniv = new Date(start); anniv.setFullYear(start.getFullYear() + years);
+    if (anniv > now) { years--; anniv.setFullYear(anniv.getFullYear() - 1); }
+    var days = Math.floor((now - anniv) / 864e5);
+    return years + " years, " + days + " days" + (suffix ? " " + suffix : "");
+  }
+
+  function render(c) {
+    POSTS = (c.posts || []).map(function (p, i) { return Object.assign({ index: i }, p); });
+    FORTUNES = c.fortunes && c.fortunes.length ? c.fortunes : ["..."];
+    var newest = POSTS.slice().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+    var home = c.home || {};
+
+    // home: fetch + intro + recent posts
+    $("fetch-kv").insertAdjacentHTML("beforeend", (home.fetch || []).map(function (f) {
+      var v = f.since ? esc(uptime(f.since, f.suffix)) : f.href ? link(f.value, f.href) : esc(f.value);
+      return "<dt>" + esc(f.key) + "</dt><dd>" + v + "</dd>";
+    }).join(""));
+    $("intro").textContent = home.intro || "";
+    $("recent").innerHTML = newest.slice(0, 3).map(function (p) {
+      return '<li><time datetime="' + esc(p.date) + '">' + esc(lsDate(p.date)) + "</time>" + postLink(p, p.title) + "</li>";
+    }).join("");
+
+    // blog: ls -lt
+    $("ls").insertAdjacentHTML("beforeend", newest.map(function (p) {
+      return '<div class="row"><span class="perm">-rw-r--r--</span><span class="size">' + esc(p.size || "") + "</span>" +
+        '<span class="date">' + esc(lsDate(p.date)) + "</span>" + postLink(p, p.slug) +
+        '<span class="d">' + (p.description ? "# " + esc(p.description) : "") + "</span></div>";
+    }).join(""));
+    $("post-count").textContent = POSTS.length + (POSTS.length === 1 ? " post" : " posts");
+
+    // projects: tree
+    var pr = c.projects || {}, groups = pr.groups || [], dirs = groups.length;
+    function branch(last) { return '<span class="br">' + (last ? "└── " : "├── ") + "</span>"; }
+    $("tree").innerHTML = groups.map(function (g, gi) {
+      var items = g.items || [];
+      dirs += items.length;
+      return '<div class="node grp' + (gi === groups.length - 1 ? " last" : "") + '">' + branch(gi === groups.length - 1) +
+        '<span class="blu">' + esc(g.name) + "/</span>" + (g.note ? '<span class="note"># ' + esc(g.note) + "</span>" : "") +
+        '<div class="body">' + items.map(function (it, i) {
+          var last = i === items.length - 1, ex = it.example;
+          return '<div class="node' + (last ? " last" : "") + '">' + branch(last) +
+            (it.href ? link(it.name + "/", it.href) : '<span class="dir">' + esc(it.name) + "/</span>") +
+            (it.tag ? '<span class="tag">' + esc(it.tag) + "</span>" : "") +
+            '<div class="body">' + [].concat(it.text || []).map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") +
+            (ex ? '<pre aria-label="' + esc(ex.label || "") + '"><span class="dim">$</span> ' + esc(ex.command || "") + "\n" +
+              esc([].concat(ex.output || []).join("\n")) + "</pre>" : "") +
+            "</div></div>";
+        }).join("") + "</div></div>";
+    }).join("");
+    $("tree-sum").textContent = dirs + (dirs === 1 ? " directory" : " directories") + (pr.footer ? ", " + pr.footer : "");
+
+    // about: text, toml, git log
+    var ab = c.about || {};
+    $("about-text").innerHTML = [].concat(ab.text || []).map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("");
+    var cfg = ab.config || {}, w = 0;
+    Object.keys(cfg).forEach(function (s) { Object.keys(cfg[s]).forEach(function (k) { w = Math.max(w, k.length); }); });
+    function tomlVal(v) {
+      if (Array.isArray(v)) return "[" + v.map(tomlVal).join(", ") + "]";
+      if (v && typeof v === "object") return '<span class="s">"' + link(v.text, v.href) + '"</span>';
+      return '<span class="s">"' + esc(v) + '"</span>';
+    }
+    $("toml").innerHTML = Object.keys(cfg).map(function (s) {
+      return '<span class="h">[' + esc(s) + "]</span>\n" + Object.keys(cfg[s]).map(function (k) {
+        return '<span class="k">' + esc(k) + "</span>" + " ".repeat(w - k.length) + " = " + tomlVal(cfg[s][k]);
+      }).join("\n");
+    }).join("\n\n");
+    $("log").innerHTML = (ab.log || []).map(function (l) {
+      return '<span class="sha">' + esc(l.sha) + "</span> " + (l.ref ? '<span class="ref">(' + esc(l.ref) + ")</span> " : "") + esc(l.message);
+    }).join("\n");
+  }
 
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -1159,6 +685,7 @@ rl.on("line", (line) =&gt; {
   }
 
   function show(i, keepHash) {
+    postReq++; // drop any post still loading
     if (i === cur && !postOpen) return;
     token++; // stop any typing in progress
     if (cur >= 0) {
@@ -1185,21 +712,37 @@ rl.on("line", (line) =&gt; {
     if (location.hash.slice(1) !== h) history.pushState(null, "", url);
   }
 
+  // Full post bodies are author-written HTML files named by "file" in content.json.
+  // They are trusted and inserted as-is; posts without one show their escaped summary.
+  var postCache = {}, postReq = 0;
+  function getText(url) {
+    if (!postCache[url]) postCache[url] = fetch(url, { cache: "no-cache" }).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.text();
+    }).catch(function (e) { delete postCache[url]; throw e; });
+    return postCache[url];
+  }
+
   function openPost(n, keepHash) {
     var p = POSTS[n]; if (!p) return;
+    var my = ++postReq;
+    (p.file ? getText(p.file) : Promise.resolve(null)).then(
+      function (html) { if (my === postReq) renderPost(n, p, html, null, keepHash); },
+      function () { if (my === postReq) renderPost(n, p, null, "less: " + p.file + ": No such file or directory", keepHash); });
+  }
+
+  function renderPost(n, p, html, err, keepHash) {
     if (cur !== 1) show(1, true);
     token++;
     postOpen = true;
     document.body.classList.add("reading");
     var el = $("blog-post");
-    // Full posts live in <template id="post-body-N"> (trusted, author-written HTML).
-    // Short posts are built from their escaped summary paragraphs.
-    var tpl = $("post-body-" + n);
-    var body = tpl ? tpl.innerHTML :
-      p.body.map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") +
-      '<p class="dim">[placeholder: the full post goes here]</p>';
+    var body = html !== null ? html :
+      [].concat(p.summary || []).map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") +
+      '<p class="dim">' + esc(err || "[placeholder: the full post goes here]") + "</p>";
+    var tpl = html !== null;
     el.innerHTML =
-      '<div class="block"><p class="line"><span class="ps1"><b>matthis@tthisk</b>:<em>~</em>$ </span>' +
+      '<div class="block"><p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span>' +
       '<span class="cmd" data-cmd="less blog/' + esc(p.slug) + '">less blog/' + esc(p.slug) + '</span></p>' +
       '<div class="out post' + (tpl ? " long" : "") + '"><h1>' + esc(p.title) + '</h1>' +
       '<div class="meta">' + esc(p.date) + ' &middot; ' + esc(p.read) + ' read</div>' +
@@ -1348,7 +891,6 @@ rl.on("line", (line) =&gt; {
   }
   $("cow").addEventListener("click", newFortune);
   $("cow").addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); newFortune(); } });
-  newFortune();
 
   // ---- ls -la reveals dotfiles ----
   $("la").addEventListener("click", function () {
@@ -1442,23 +984,23 @@ rl.on("line", (line) =&gt; {
   });
   help.addEventListener("click", function () { toggleHelp(false); });
 
-  // ---- status line clock + uptime ----
+  // ---- status line clock ----
   function tick() {
     var d = new Date();
     $("clock").textContent = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
     $("date").textContent = d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
   }
   tick(); setInterval(tick, 10000);
-  (function () {
-    var start = new Date(2012, 8, 1), now = new Date();
-    var years = now.getFullYear() - start.getFullYear();
-    var anniv = new Date(start); anniv.setFullYear(start.getFullYear() + years);
-    if (anniv > now) { years--; anniv.setFullYear(anniv.getFullYear() - 1); }
-    var days = Math.floor((now - anniv) / 864e5);
-    $("uptime").textContent = years + " years, " + days + " days (writing code)";
-  })();
 
-  route();
+  // ---- load the site text, then start ----
+  fetch("content.json", { cache: "no-cache" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (c) { render(c); newFortune(); route(); })
+    .catch(function (e) {
+      console.error(e);
+      route();
+      sudoLine("cat content.json", ["cat: content.json: could not load the site text (" + e.message + ")"]);
+    });
 })();
 </script>
 </body>

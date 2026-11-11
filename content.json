@@ -1,0 +1,178 @@
+{
+  "home": {
+    "fetch": [
+      { "key": "role", "value": "Staff software engineer" },
+      { "key": "langs", "value": "Kotlin, Java, TypeScript, Go" },
+      { "key": "editor", "value": "Neovim, mostly" },
+      { "key": "shell", "value": "fish" },
+      { "key": "uptime", "since": "2012-09-01", "suffix": "(writing code)" },
+      { "key": "contact", "value": "m@tthisk.com", "href": "mailto:m@tthisk.com" }
+    ],
+    "intro": "I write about systems, tooling, and the craft of making things for humans and computers."
+  },
+
+  "fortunes": [
+    "Simplicity is prerequisite for reliability. -- Dijkstra",
+    "Make it work, make it right, make it fast. -- Kent Beck",
+    "There are only two hard things: cache invalidation, naming things, and off-by-one errors.",
+    "Premature optimization is the root of all evil. -- Knuth",
+    "It works on my machine.",
+    "Programs must be written for people to read, and only incidentally for machines to execute. -- Abelson & Sussman",
+    "The best code is no code at all.",
+    "Have you tried turning it off and on again?",
+    "Weeks of coding can save you hours of planning.",
+    "Deleted code is debugged code. -- Jeff Sickel"
+  ],
+
+  "posts": [
+    {
+      "slug": "writing-a-tiny-lisp.md",
+      "title": "Writing a tiny Lisp in a weekend",
+      "date": "2026-10-28",
+      "read": "11 min",
+      "size": "12K",
+      "description": "a reader, an evaluator and a REPL in ~400 lines",
+      "summary": [
+        "A reader, an evaluator and a REPL in about four hundred lines. Lisp is the rare language where the parser fits on a postcard, so most of the weekend goes into the interesting part: environments, closures and tail calls.",
+        "This post walks through each piece in the order I wrote it, including the two places where I got scoping wrong."
+      ],
+      "file": "posts/writing-a-tiny-lisp.html"
+    },
+    {
+      "slug": "in-defence-of-boring-tech.md",
+      "title": "In defence of boring technology",
+      "date": "2026-09-14",
+      "read": "5 min",
+      "size": "9.1K",
+      "description": "postgres, cron and one server go a long way",
+      "summary": [
+        "Postgres, cron and one server will take you further than you think. Boring tools have known failure modes, good documentation and answers on the first page of search results.",
+        "Spend your novelty budget on the part of the product that is actually new."
+      ]
+    },
+    {
+      "slug": "crdts-without-the-math.md",
+      "title": "CRDTs explained without the math",
+      "date": "2026-08-02",
+      "read": "9 min",
+      "size": "15K",
+      "description": "sticky notes instead of lattices",
+      "summary": [
+        "How do collaborative editors stay in sync when everyone types at once? With data structures that can always be merged, in any order, and end up the same.",
+        "We will build one out of sticky notes instead of lattices."
+      ]
+    },
+    {
+      "slug": "dotfiles-ten-years-later.md",
+      "title": "My dotfiles, ten years later",
+      "date": "2026-06-19",
+      "read": "4 min",
+      "size": "7.4K",
+      "description": "a decade of aliases and the occasional regret",
+      "summary": [
+        "A decade of aliases and the occasional regret. Some of these files are older than my laptop, and a few are older than the tools they configure.",
+        "Here is what survived, what I deleted, and the one alias I type more than my own name."
+      ]
+    },
+    {
+      "slug": "asynchronous-streams-and-callbacks.md",
+      "title": "Asynchronous streams and callbacks",
+      "date": "2020-05-01",
+      "read": "5 min",
+      "size": "8.2K",
+      "description": "backpressure, simulated with callbacks",
+      "summary": [
+        "How asynchronous streams simulate backpressure with callbacks."
+      ],
+      "file": "posts/asynchronous-streams-and-callbacks.html"
+    }
+  ],
+
+  "projects": {
+    "groups": [
+      {
+        "name": "personal",
+        "note": "educational, open source",
+        "items": [
+          {
+            "name": "zlox",
+            "href": "https://github.com/matthisk/zlox",
+            "tag": "zig",
+            "text": [
+              "A bytecode interpreter for Lox, the language from Crafting Interpreters, written in Zig: a single-pass Pratt compiler, a stack-based VM with closures and classes, and a mark-and-sweep garbage collector.",
+              "It adds arrays, continue, file output and wider operands to the book's version, enough to write a Mandelbrot renderer, a raytracer and Game of Life in Lox itself."
+            ]
+          },
+          {
+            "name": "shader-playground",
+            "href": "https://github.com/matthisk/shader-playground",
+            "tag": "webgl",
+            "text": "A browser playground for learning ray tracing on the GPU. Place and drag cubes in a three.js scene, then switch to a full-screen GLSL fragment shader that receives the same scene, and write the raytracer that renders it."
+          }
+        ]
+      },
+      {
+        "name": "work",
+        "note": "professional, at Miro",
+        "items": [
+          {
+            "name": "entitlements",
+            "tag": "10k rps",
+            "text": [
+              "Led the build and operation of Miro's entitlement checks: the system that decides, on every guarded action, whether a customer's plan includes the feature. 10k requests per second sustained, more at peak.",
+              "Every service depends on it, so it can't be a single point of failure. Entitlements are pushed to a sidecar next to each team's service, which keeps them in memory and refreshes from Kafka or reads a precomputed view in Redis. Shipped in 2024; it covers on/off features, limits (3 boards on the free plan) and AI credit metering.",
+              "A change to a huge plan (the free plan has over 20M users) isn't precomputed per customer. One message goes out and sidecars compute the entitlement at read time, so there's no long consistency gap."
+            ]
+          },
+          {
+            "name": "instruqt-sandboxes",
+            "tag": "terraform",
+            "text": [
+              "Sandboxes for hands-on workshops, anything from a single node to a full Kubernetes cluster, provisioned and torn down with Terraform from precomputed plans.",
+              "The load comes in spikes: a trainer starts a workshop and thousands of sandboxes spin up at once, on top of CI runs that play through customers' courses. A predictive scheduler warmed sandboxes up ahead of scheduled training dates. I also led and built webhooks for the platform."
+            ]
+          },
+          {
+            "name": "mermaid-multiplayer",
+            "tag": "research",
+            "text": "Led research into real-time collaboration for Miro's Mermaid diagrams, which users edit both as code and visually. Showed that the existing OT framework couldn't resolve concurrent visual operations, and wrote the design for multiplayer built on our visual actions with custom conflict resolution."
+          },
+          {
+            "name": "mermaid-fuzzer",
+            "tag": "testing",
+            "text": "A seeded fuzzer for the library that turns visual operations (delete a node, say) into edits of the Mermaid source. It generates valid diagrams, applies random operations, and reports any result that fails to parse or differs from the expected state. A CLI replays a failure from its seed; in CI it catches regressions."
+          }
+        ]
+      }
+    ],
+    "footer": "0 regrets"
+  },
+
+  "about": {
+    "text": [
+      "Product-minded Staff Engineer with 10+ years of experience combining deep technical work, organizational leadership, and measurable business impact. I set technical direction, align teams around complex problems, and connect engineering decisions to product outcomes.",
+      "After three years leading teams across growth and solutions streams at Miro, I deliberately returned to the individual-contributor track - bringing the perspective of an experienced Engineering Manager to hands-on Staff Engineer work"
+    ],
+    "config": {
+      "work": {
+        "role": "Staff software engineer",
+        "languages": ["Kotlin", "Java", "Typescript", "Go"]
+      },
+      "now": {
+        "building": "Better diagramming with AI @ Miro",
+        "harness": "Claude"
+      },
+      "contact": {
+        "email": { "text": "m@tthisk.com", "href": "mailto:m@tthisk.com" },
+        "github": { "text": "github.com/matthisk", "href": "https://github.com/matthisk" }
+      }
+    },
+    "log": [
+      { "sha": "7be0d14", "ref": "HEAD -> main", "message": "Miro" },
+      { "sha": "19c4e8a", "date": "2020-2022", "message": "Instruqt" },
+      { "sha": "e02d7b5", "date": "2016-2020", "message": "Xebia" },
+      { "sha": "e02d7b5", "date": "2015-2016", "message": "Getstream.io" },
+      { "sha": "0000001", "date": "01-05-1992", "message": "Initial commit" }
+    ]
+  }
+}

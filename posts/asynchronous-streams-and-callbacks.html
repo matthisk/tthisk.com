@@ -1,0 +1,100 @@
+<p class="lede">Asynchronous streaming solutions, such as Rx or Reactor, rely on callbacks to perform flow control (or backpressure). Without flow control, systems could overflow and eventually crash. What is the difference between flow control in synchronous applications and their asynchronous counterparts?</p>
+
+<h2>Understanding backpressure</h2>
+
+<p>A stream consists of a chain of <em>publishers</em> and <em>subscribers</em>. A publisher produces new values and the subscriber consumes them. In between the two sits a <em>buffer</em> that can hold values until the consumer is ready to consume them. The following image illustrates a chain of a single publisher and subscriber:</p>
+
+<figure class="fig img small">
+  <div class="frame"><img src="img/backpressure-1-single.png" width="540" height="150" alt="A publisher P, a buffer and a subscriber S in a row, running sequentially on one thread."></div>
+  <figcaption><b>fig. 1</b> &mdash; Synchronous publisher and subscriber running sequentially.</figcaption>
+</figure>
+
+<p>If the publisher and subscriber operate concurrently, the publisher could overflow the buffer. This happens when the publisher is emitting items faster than the subscriber can consume them. Throttling the publisher to avoid overflowing the subscriber is what we call backpressure.</p>
+
+<p>If the publisher and subscriber are synchronous; we could block the producer when the buffer is about to overflow. The Java standard library ships with a Queue implementation for this called a <a href="https://docs.oracle.com/javase/7/docs/api/java/util/concurrent/BlockingQueue.html" rel="noreferrer nofollow noopener">blocking queue</a>. This queue will block the thread performing a put operation on a full queue and unblock the producer once an item is taken from the queue.</p>
+
+<div class="callout">
+  <p><span class="tag">Note on blocking.</span> What does it mean for the put operation to block? It means that the thread on which this operation runs will be parked, freeing up the CPU on which it was running. The operating system will schedule one or more threads to run in the meantime. When the subscriber takes an element from the queue, the producer&rsquo;s thread will be unparked and execution of the producer will continue.</p>
+</div>
+
+<p>By parking the producer&rsquo;s thread, the blocking queue makes it impossible for the producer to outpace the subscriber. Since the producer will not be granted CPU time until more space becomes available in the queue.</p>
+
+<figure class="fig img">
+  <div class="frame"><img src="img/backpressure-2-threads.png" width="653" height="312" alt="Publisher and subscriber on separate threads, connected by a blocking queue."></div>
+  <figcaption><b>fig. 2</b> &mdash; Synchronous publisher and subscriber running on separate threads.</figcaption>
+</figure>
+
+<p>Synchronous streams can block the threads on which producers and subscribers execute, as such they can rely on a <code>BlockingQueue</code> to guarantee backpressure. But what if we wanted to implement a stream that operates asynchronously, such streams are not allowed to block the threads upon which the producer and subscriber execute. Because they are non-blocking, they cannot rely on a <code>BlockingQueue</code> to prevent the buffer from overflowing.</p>
+
+<figure class="fig img">
+  <div class="frame"><img src="img/backpressure-3-async.png" width="653" height="391" alt="Asynchronous publisher and subscriber on separate threads, with no blocking between them."></div>
+  <figcaption><b>fig. 3</b> &mdash; Asynchronous publisher and subscriber on separate threads.</figcaption>
+</figure>
+
+<p>Because asynchronous code cannot rely on a <code>BlockingQueue</code>, flow control needs to be simulated through an asynchronous concurrency primitive. In the Java runtime the only primitive available to write asynchronous code is the <em>callback</em>; how can we use callbacks to throttle a producer?</p>
+
+<div class="callout">
+  <p><span class="tag">Note on asynchronous primitives and promises.</span> Futures or Promises also rely on callbacks, you create them by supplying a callback that will be invoked once the operation completes. Futures help with composing multiple asynchronous tasks but underneath there is no other <em>concurrency primitive</em>.</p>
+</div>
+
+<h2>Simulating flow control</h2>
+
+<p>Let&rsquo;s take a look at part of the reactive streams specification, to understand how it uses callbacks to simulate flow control. In a reactive stream the publisher uses a callback on the subscriber to send elements:</p>
+
+<figure class="code">
+  <figcaption><b>Subscriber.java</b><span>java &middot; simplified</span></figcaption>
+  <pre><code data-lang="java">public interface Subscriber&lt;T&gt; {
+    public void onNext(T t);
+}</code></pre>
+</figure>
+
+<p>Since the subscriber could be operating on concurrently from the producer, the single callback cannot guarantee flow control. So, a reactive stream introduces a second callback, not from publisher to subscriber but from subscriber to publisher. This callback is part of the subscription a subscriber has to a producer. On this subscription backpressure is <em>simulated</em> by allowing the subscriber to communicate the number of items it can handle:</p>
+
+<figure class="code">
+  <figcaption><b>Subscription.java</b><span>java &middot; simplified</span></figcaption>
+  <pre><code data-lang="java">public interface Subscription {
+    public void request(long n);
+}</code></pre>
+</figure>
+
+<figure class="fig img">
+  <div class="frame"><img src="img/backpressure-4-callbacks.png" width="1307" height="625" alt="Publisher P calls onNext on subscriber S; S calls request back on P."></div>
+  <figcaption><b>fig. 4</b> &mdash; Callback based publisher and subscriber.</figcaption>
+</figure>
+
+<p>This second callback allows a reactive stream to <em>simulate</em> flow control without blocking underlying threads. Where a blocking implementation guarantees that a publisher could not overflow a subscriber, because the operating system can park the producer&rsquo;s thread, the non-blocking variant has no such guarantee. A publisher does not have to adhere to the limits supplied by the subscriber through the request callback.</p>
+
+<h2>Implications for operators</h2>
+
+<p>An operator (e.g. <code>map</code>) is both a subscriber, because it receives items from the upstream, and a publisher because it produces items for the downstream. Operators are used to alter the stream by reacting to items passing through it. Because an operator is a publisher it needs to account for backpressure from the downstream <a href="https://github.com/ReactiveX/RxJava/wiki/Writing-operators-for-2.0#backpressure-and-cancellation" rel="noreferrer nofollow noopener">inside its implementation</a>.</p>
+
+<p>Accounting for backpressure in the implementation of an operator means that the implementer of an operator is responsible for adhering to the flow control contract. It is not allowed to send more items to the downstream than are requested. And the operator needs to ensure it requests enough items from the upstream; as to not stall the stream.</p>
+
+<p>To demonstrate how a stream could stall we can look at the <a href="https://github.com/ReactiveX/RxJava/wiki/Writing-operators-for-2.0#replenishing" rel="noreferrer nofollow noopener">filter operator</a> from the Rx docs. Because a filter operator does not emit all elements it receives, it needs to request additional items from the upstream for each ignored element:</p>
+
+<figure class="code">
+  <figcaption><b>FilterOperator.java</b><span>java &middot; simplified</span></figcaption>
+  <pre><code data-lang="java">public void onNext(Integer item) {
+    if (item % 2 != 0) {
+       downstream.onNext(item);
+    } else {
+       // If we forget to request an additional item, our stream will stall
+       upstream.request(1);
+    }
+}</code></pre>
+</figure>
+
+<p>The synchronization required to account for backpressure in an asynchronous stream becomes more apparent when implementing a <a href="https://github.com/ReactiveX/RxJava/wiki/Writing-operators-for-2.0#stable-prefetching" rel="noreferrer nofollow noopener">buffer operator</a>. Here a drain method simulates flow control together with the concern of cancellation, error handling, and completion. Where a <code>BlockingQueue</code> of a synchronous stream would provide this pattern without additional synchronization. The asynchronous variant requires complex orchestration.</p>
+
+<h2>Conclusion</h2>
+
+<p>Streams require flow control to prevent a publisher from overflowing a subscriber. Where synchronous streams can rely on primitives such as a <code>BlockingQueue</code> to provide this flow control, asynchronous streams need to rely on <em>callbacks</em> to <em>simulate</em> backpressure. This creates a complex contract between a publisher and subscriber, making implementation and usage of asynchronous streams harder and more error prone than their synchronous counterparts. This is not to say asynchronous streams are <em>bad</em>. But it is to demonstrate that while useful, asynchronous streams are build on top of a complex abstraction, namely that of simulating flow control with callbacks. What if we could build asynchronous streams on top of an asynchronous blocking queue, this would combine the best of both worlds.</p>
+
+<hr>
+
+<p class="dim"><em>This is part 1 in a multi part series on asynchronous streaming.</em></p>
+<ol class="series">
+  <li class="here">Asynchronous streams and callbacks</li>
+  <li>Asynchronous streams and coroutines</li>
+  <li>Asynchronous streams and Kotlin</li>
+</ol>
