@@ -174,7 +174,7 @@
   .intro p:first-child { color: var(--bright); }
   .cow { margin: 0; font: inherit; line-height: 1.3; cursor: pointer; color: var(--fg); white-space: pre; overflow-x: auto; }
   .cow:hover .moo { color: var(--green); }
-  .avatar { display: block; width: 24ch; max-width: 100%; height: auto; image-rendering: pixelated; }
+  .avatar { display: block; width: 38ch; max-width: 100%; height: auto; image-rendering: pixelated; }
   .recent { list-style: none; margin: 0; padding: 0; }
   .recent li { display: grid; grid-template-columns: 8ch 1fr; column-gap: 1.5ch; }
   .recent time { color: var(--dim); }
@@ -349,6 +349,7 @@
   .log { margin: 0; font: inherit; white-space: pre-wrap; }
   .log .sha { color: var(--accent-2); }
   .log .ref { color: var(--blue); }
+  .log .date { color: var(--dim); }
 
   /* ---- status line ---- */
   .status {
@@ -505,9 +506,9 @@
             </div>
           </div>
           <div class="block">
-            <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">chafa img/pixel-profile.png</span></p>
+            <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd" id="avatar-cmd">chafa img/pixel-profile-2.jpeg</span></p>
             <div class="out">
-              <img class="avatar" src="img/pixel-profile.png" width="640" height="864" alt="Pixel-art portrait of Matthis in blue and cream">
+              <img class="avatar" id="avatar-img" src="img/pixel-profile-2.jpeg" alt="Pixel-art portrait of Matthis in blue and cream">
             </div>
           </div>
           <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
@@ -562,7 +563,7 @@
         </div>
       </div>
       <div class="block">
-        <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">git log --oneline -5 -- life/</span></p>
+        <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">git log --oneline -5 -- career/</span></p>
         <div class="out">
 <pre class="log" id="log"></pre>
         </div>
@@ -702,8 +703,11 @@
         return '<span class="k">' + esc(k) + "</span>" + " ".repeat(w - k.length) + " = " + tomlVal(cfg[s][k]);
       }).join("\n");
     }).join("\n\n");
-    $("log").innerHTML = (ab.log || []).map(function (l) {
-      return '<span class="sha">' + esc(l.sha) + "</span> " + (l.ref ? '<span class="ref">(' + esc(l.ref) + ")</span> " : "") + esc(l.message);
+    var logs = ab.log || [];
+    var dw = Math.max.apply(null, logs.map(function (l) { return (l.date || "").length; }));
+    $("log").innerHTML = logs.map(function (l) {
+      var d = l.date || "";
+      return '<span class="sha">' + esc(l.sha) + "</span> " + '<span class="date">' + esc(d) + " ".repeat(dw - d.length) + "</span> " + (l.ref ? '<span class="ref">(' + esc(l.ref) + ")</span> " : "") + esc(l.message);
     }).join("\n");
   }
 
@@ -719,6 +723,12 @@
   var cur = -1, token = 0, postOpen = false;
 
   // Remember each command's text so it can be typed out again.
+  // pick one of the pixel portraits at random on each load
+  (function () {
+    var pic = "img/pixel-profile-" + (2 + Math.floor(Math.random() * 3)) + ".jpeg";
+    document.getElementById("avatar-img").src = pic;
+    document.getElementById("avatar-cmd").textContent = "chafa " + pic;
+  })();
   document.querySelectorAll(".cmd").forEach(function (c) { c.dataset.cmd = c.textContent; });
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }

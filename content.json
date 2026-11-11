@@ -1,7 +1,7 @@
 {
   "home": {
     "fetch": [
-      { "key": "role", "value": "Staff software engineer" },
+      { "key": "role", "value": "Staff Software Engineer" },
       { "key": "langs", "value": "Kotlin, Java, TypeScript, Go" },
       { "key": "editor", "value": "Neovim, mostly" },
       { "key": "shell", "value": "fish" },
@@ -21,7 +21,9 @@
     "The best code is no code at all.",
     "Have you tried turning it off and on again?",
     "Weeks of coding can save you hours of planning.",
-    "Deleted code is debugged code. -- Jeff Sickel"
+    "Deleted code is debugged code. -- Jeff Sickel",
+    "Debugging? Klingons do not debug. Our software does not coddle the weak. -- Klingon Programmer",
+    "Our users will know fear and cower before our software! Ship it! Ship it and let them flee like the dogs they are! -- Klingon Programmer"
   ],
 
   "posts": [
@@ -155,20 +157,21 @@
     ],
     "config": {
       "work": {
-        "role": "Staff software engineer",
+        "role": "Staff Software Engineer",
         "languages": ["Kotlin", "Java", "Typescript", "Go"]
       },
       "now": {
-        "building": "Better diagramming with AI @ Miro",
-        "harness": "Claude"
+        "building": "Mermaid based Diagramming @ Miro",
+        "harness": "Claude Code"
       },
       "contact": {
         "email": { "text": "m@tthisk.com", "href": "mailto:m@tthisk.com" },
-        "github": { "text": "github.com/matthisk", "href": "https://github.com/matthisk" }
+        "github": { "text": "github.com/matthisk", "href": "https://github.com/matthisk" },
+        "linkedin": { "text": "linkedin.com/in/matthisk", "href": "https://linkedin.com/in/matthisk" }
       }
     },
     "log": [
-      { "sha": "7be0d14", "ref": "HEAD -> main", "message": "Miro" },
+      { "sha": "7be0d14", "ref": "HEAD -> main", "date": "2022-now", "message": "Miro" },
       { "sha": "19c4e8a", "date": "2020-2022", "message": "Instruqt" },
       { "sha": "e02d7b5", "date": "2016-2020", "message": "Xebia" },
       { "sha": "e02d7b5", "date": "2015-2016", "message": "Getstream.io" },
