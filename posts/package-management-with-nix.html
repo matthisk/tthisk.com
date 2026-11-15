@@ -1,0 +1,156 @@
+<p class="lede">As software engineers we use package managers on a daily basis. We use them to install dependencies we need to run and build software we write. Probably every software engineer can relate to the frustration that will eventually arise from using these package managers. Sometimes packages that seem to work on your colleagues&rsquo; machine just fine, are broken on yours. Even though package managers have improved substantially over time, issues like these still arise. Maybe there is some fundamental design flaw in the way we approach package management. There is a package manager that tries to do things differently and it is called Nix. Let&rsquo;s take a look at what Nix is and how you can use it on your machine today.</p>
+
+<h2>Enter the Nix</h2>
+
+<p>Nix is many things: a language, an operating system (NixOS), a deployment system, and a continuous integration system (Hydra). But at its core it is a package manager, specifically a package manager that is designed from the ground up to be pure and immutable. Pure in the sense that building a package can not perform any uncontrolled side-effects, and immutable in the sense that no global package state is mutated in place. This is a fundamental shift from the current approach to installing packages where we install all binaries to a global and mutable directory e.g. <code>/usr/local/bin</code>. This shift allows us to support different versions of the same executable or library on our operating system.</p>
+
+<p>Nix is pure, which means it can distinguish the same package build with different input parameters. It captures all input parameters, which could be anything from the version of GCC, to the library dependencies (e.g. glibc). So in Nix a bundled package is not just referenced by its name and version, but is prefixed with the aggregation of <strong>all</strong> parameters used to build that package. This aggregation is represented as a hash, so when any of the input parameters changes this hash will also change.</p>
+
+<p>Referencing binaries by these hashes would be really unproductive, we want to be able to type <code>git</code> in our terminal and not <code>86b4f4cd27e63c8e05c745807dd281ec04c38521-git</code>. Nix solves this problem by creating a symlink under the name git inside a directory exposed on your <code>PATH</code> to the actual location of the git binary in the nix store. A collection of such symlinks is called a profile.</p>
+
+<p>Symlinks enable immutability. Because we no longer have to mutate the binaries directly inside directories exposed on our <code>PATH</code> (e.g. <code>/usr/local/bin</code>), but instead rely on the <code>/nix/store</code> directory. And atomic operations, because the creation of symlinks happen as a final step in our installation procedure. So an installation that fails half-way through will not have any noticeable side-effects.</p>
+
+<h2>Tutorial</h2>
+
+<p>In this tutorial I will explain how you can use Nix to install binaries and create isolated and reproducible development environments. It is, by no stretch of the imagination, a complete guide on how to use Nix. But hopefully it will capture your imagination of Nix&rsquo;s possibilities.</p>
+
+<p>Install the Nix package manager:</p>
+
+<figure class="code">
+  <figcaption><b>install</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ curl https://nixos.org/nix/install | sh</code></pre>
+</figure>
+
+<p>After installation we have some new commands available:</p>
+
+<ul>
+  <li><code>nix-env</code> used to install dependencies and alter your current profile</li>
+  <li><code>nix-shell</code> used to start shells based on nix expressions</li>
+  <li><code>nix-store</code> used to query or manipulate the nix store</li>
+</ul>
+
+<p>And a directory has been created for the nix store at <code>/nix</code>, this directory contains all installed packages, profiles and configuration. Your global environment will only be mutated by symlinking into the nix store. We can now execute several actions to search, install, and uninstall packages:</p>
+
+<figure class="code">
+  <figcaption><b>search</b><span>search for packages starting with nodejs in the remote repository</span></figcaption>
+  <pre><code data-lang="bash">$ nix-env -qaP 'nodejs.*'</code></pre>
+</figure>
+
+<figure class="code">
+  <figcaption><b>install</b><span>install Node 12 in your profile</span></figcaption>
+  <pre><code data-lang="bash">$ nix-env -iA nixpkgs.nodejs-12_x</code></pre>
+</figure>
+
+<figure class="code">
+  <figcaption><b>which</b><span>node&rsquo;s binary is reachable from .nix-profile</span></figcaption>
+  <pre><code data-lang="bash">$ which node</code></pre>
+</figure>
+
+<p>Running <code>which node</code> will show that node&rsquo;s binary is reachable from a directory called <code>.nix-profile</code>. If you follow the symlinks in the directory you will end up at a binary in the nix store somewhere in <code>/nix/store</code>.</p>
+
+<p>You can inspect the <code>/nix/store</code> directory to see all the dependencies that are currently installed on your machine. You will see that all packages are prefixed by a hash, which as mentioned in the first section represent all the input parameters used to build this package.</p>
+
+<p>When we install a second version of Node it would override the symlink in our nix-profile.</p>
+
+<figure class="code">
+  <figcaption><b>install</b><span>install Node 11</span></figcaption>
+  <pre><code data-lang="bash">$ nix-env -iA nixpkgs.nodejs-11_x
+$ node --version</code></pre>
+</figure>
+
+<p>When you run <code>node --version</code> it will tell you node is bound to version 11.</p>
+
+<p>Since the binary of node is a symlink to the actual binary stored within the nix store (at <code>/nix</code>), we can also load an isolated shell which points node to a specific version of node in the nix store.</p>
+
+<figure class="code">
+  <figcaption><b>nix-shell</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ nix-shell -p nodejs-12_x</code></pre>
+</figure>
+
+<p>This starts a new shell in which nodejs 12 is available. Once you exit the shell nodejs 12 will no longer be on your path.</p>
+
+<p>With the Nix language it is also possible to write a configuration file that we can reuse. These configuration files are called derivations and are the most important building block of Nix. They describe how packages are to be built and with what parameters. Take for example this derivation which will load nodejs v12 in the environment:</p>
+
+<figure class="code">
+  <figcaption><b>default.nix</b><span>nix</span></figcaption>
+  <pre><code data-lang="nix">with import &lt;nixpkgs&gt; {};
+
+stdenv.mkDerivation {
+  name = "node-environment";
+
+  buildInputs = [
+    pkgs.nodejs-12_x
+  ];
+}</code></pre>
+</figure>
+
+<p>If you want to learn more about writing Nix derivations see the nix-pill on <a href="https://nixos.org/nixos/nix-pills/our-first-derivation.html" rel="noreferrer nofollow noopener">writing derivations</a>.</p>
+
+<p>If we store this file as <code>default.nix</code> we can load it inside a nix shell with the following command:</p>
+
+<figure class="code">
+  <figcaption><b>nix-shell</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ nix-shell default.nix</code></pre>
+</figure>
+
+<p>We can now create reproducible development environments by writing a Nix derivation. To enter the environment we still require an invocation of <code>nix-shell</code>, but we could also leverage a tool called direnv to automatically load the derivation while entering the directory containing our <code>default.nix</code>.</p>
+
+<h2>Bonus: in tandem with direnv</h2>
+
+<p><a href="https://direnv.net/" rel="noreferrer nofollow noopener">direnv</a> is an environment management tool developed by <a href="https://zimbatm.com/" rel="noreferrer nofollow noopener">zimbatm</a>. It essentially sets and removes environment variables in the shell depending on the current directory and the presence of a <code>.envrc</code> file.</p>
+
+<blockquote>
+  <p>Before each prompt, direnv checks for the existence of a .envrc file in the current and parent directories. If the file exists (and is authorized), it is loaded into a bash sub-shell and all exported variables are then captured by direnv and then made available to the current shell.</p>
+</blockquote>
+
+<p>Since direnv supports Nix out of the box we only need to create a <code>.envrc</code> and enable the Nix integration. To do this run the following in the directory containing your <code>default.nix</code> file:</p>
+
+<figure class="code">
+  <figcaption><b>direnv</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ direnv edit .</code></pre>
+</figure>
+
+<p>Add the following line to the file to enable the Nix integration, and save:</p>
+
+<figure class="code">
+  <figcaption><b>.envrc</b></figcaption>
+  <pre><code data-lang="envrc">use nix</code></pre>
+</figure>
+
+<p>Once the file is saved direnv will automatically reload the environment. We should see something along these lines:</p>
+
+<figure class="code">
+  <figcaption><b>output</b><span>trimmed to the list of exported variables</span></figcaption>
+  <pre><code data-lang="text">direnv: loading .envrc
+direnv: using nix
+direnv: export +AR +AS +CC +CMAKE_OSX_ARCHITECTURES +CONFIG_SHELL +CXX +HOST_PATH +IN_NIX_SHELL +LD +LD_DYLD_PATH +MACOSX_DEPLOYMENT_TARGET +NIX_BINTOOLS +NIX_BINTOOLS_WRAPPER_x86_64_apple_darwin_TARGET_HOST +NIX_BUILD_CORES +NIX_BUILD_DONT_SET_RPATH +NIX_BUILD_TOP +NIX_CC +NIX_CC_WRAPPER_x86_64_apple_darwin_TARGET_HOST +NIX_CFLAGS_COMPILE +NIX_COREFOUNDATION_RPATH +NIX_CXXSTDLIB_COMPILE +NIX_CXXSTDLIB_LINK +NIX_DONT_SET_RPATH +NIX_ENFORCE_NO_NATIVE +NIX_HARDENING_ENABLE +NIX_IGNORE_LD_THROUGH_GCC +NIX_INDENT_MAKE +NIX_LDFLAGS +NIX_NO_SELF_RPATH +NIX_STORE +NM +NODE_PATH +PATH_LOCALE +RANLIB +SDKROOT +SIZE +SOURCE_DATE_EPOCH +STRINGS +STRIP +TEMP +TEMPDIR +TMP +__darwinAllowLocalNetworking +__impureHostDeps +__propagatedImpureHostDeps +__propagatedSandboxProfile +__sandboxProfile +buildInputs +builder +configureFlags +depsBuildBuild +depsBuildBuildPropagated +depsBuildTarget +depsBuildTargetPropagated +depsHostHost +depsHostHostPropagated +depsTargetTarget +depsTargetTargetPropagated +doCheck +doInstallCheck +gl_cv_func_getcwd_abort_bug +name +nativeBuildInputs +out +outputs +patches +propagatedBuildInputs +propagatedNativeBuildInputs +shell +stdenv +strictDeps +system ~PATH</code></pre>
+</figure>
+
+<p>If we run <code>which node</code> we should see that node is now loaded from the nix store:</p>
+
+<figure class="code">
+  <figcaption><b>which node</b></figcaption>
+  <pre><code data-lang="text">/nix/store/9pfsxwkr43907dp7spwidpr3hjbz0v5w-nodejs-12.5.0/bin/node</code></pre>
+</figure>
+
+<h2>Conclusion</h2>
+
+<p>Managing multiple binary versions or reproducible build environments is just the start of Nix&rsquo;s capabilities. It can be used to manage entirely reproducible operating systems or to create reproducible <a href="https://discourse.nixos.org/t/is-there-much-difference-between-using-nix-shell-and-docker-for-local-development/807" rel="noreferrer nofollow noopener">container images</a>. Nix is in potential a great tool for managing reproducible development environments. While the tooling is still a bit rough from a UX perspective and the package registry support could be better on OS X, the philosophy of Nix shows great potential for future iterations of its operating system and package manager.</p>
+
+<h2>Caveats</h2>
+
+<ul>
+  <li>Nix is only supported on Linux and Mac OS, and currently the derivation support for Linux is superior to that of Mac OS.</li>
+  <li>Since the Nix store is immutable it is not possible to install global dependencies of your programming language package manager inside the nix store. As this is exactly what npm will try to do when you run <code>npm install -g</code> this operation will fail. The following blog post describes a way in which you can circumvent this issue: <a href="http://nicknovitski.com/nix-npm-install" rel="noreferrer nofollow noopener">http://nicknovitski.com/nix-npm-install</a></li>
+</ul>
+
+<h2>Additional material</h2>
+
+<ul>
+  <li><a href="https://nixos.wiki/wiki/Cheatsheet" rel="noreferrer nofollow noopener">https://nixos.wiki/wiki/Cheatsheet</a></li>
+  <li><a href="http://sandervanderburg.blogspot.com/2011/01/nix-package-manager.html" rel="noreferrer nofollow noopener">http://sandervanderburg.blogspot.com/2011/01/nix-package-manager.html</a></li>
+  <li><a href="https://skillsmatter.com/skillscasts/8307-london-nixos-meetup" rel="noreferrer nofollow noopener">https://skillsmatter.com/skillscasts/8307-london-nixos-meetup</a></li>
+  <li><a href="https://nixos.wiki/wiki/Development_environment_with_nix-shell" rel="noreferrer nofollow noopener">https://nixos.wiki/wiki/Development_environment_with_nix-shell</a></li>
+  <li><a href="https://www.sam.today/blog/environments-with-nix-shell-learning-nix-pt-1/" rel="noreferrer nofollow noopener">https://www.sam.today/blog/environments-with-nix-shell-learning-nix-pt-1/</a></li>
+  <li><a href="https://nixos.org/nixos/nix-pills/our-first-derivation.html" rel="noreferrer nofollow noopener">https://nixos.org/nixos/nix-pills/our-first-derivation.html</a></li>
+</ul>

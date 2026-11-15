@@ -1,0 +1,128 @@
+<p class="lede">Checked exceptions were an effort by the designers of Java to express the possibility of failure in the type signature, aiding users of these methods in handling the failure scenario gracefully. While the intentions of the design were noble, the end result did not pan out as expected. Most Java programmers have dropped checked exceptions in favor of their unchecked counterparts. Contemporary Java allows us to express failure in the type signature in new and better ways. In this post I&rsquo;ll explain why checked exceptions have fallen out of favor and what better approach there is to expressing the possibility of failure.</p>
+
+<h2>The Problem</h2>
+
+<p>Checked exceptions allow us to express potential failures in the type signature of our methods. Take the following method reading a file from disk:</p>
+
+<figure class="code">
+  <figcaption><b>readFile</b><span>java</span></figcaption>
+  <pre><code data-lang="java">String readFile(String filename) throws IOException</code></pre>
+</figure>
+
+<p>Any call-site of this API is now forced to explicitly handle the possibility of the requested file not existing. We enable the compiler to help the user of our API. So far so good.</p>
+
+<p>A real world application however does not exist of a single method, but of the composition of many methods into a larger behavior. For instance we would like to parse an entity from the file we have just read from disk:</p>
+
+<figure class="code">
+  <figcaption><b>parseEntity</b><span>java</span></figcaption>
+  <pre><code data-lang="java">Entity parseEntity(String input) throws JsonParseException</code></pre>
+</figure>
+
+<p>Now we compose the result of our function to read a file, with our function to parse an entity:</p>
+
+<figure class="code">
+  <figcaption><b>composition</b><span>java</span></figcaption>
+  <pre><code data-lang="java">parseEntity(readFile("entity.json"))</code></pre>
+</figure>
+
+<p>Checked exceptions are capable of handling this composition. To do this we need to wrap this line in a try-catch block with two separate catch blocks, one for each exception type:</p>
+
+<figure class="code">
+  <figcaption><b>try-catch</b><span>java</span></figcaption>
+  <pre><code data-lang="java">try {
+  parseEntity(readFile("entity.json"))
+} catch (IOException e) {
+  /* handle IOException */
+} catch (JsonParseException e) {
+  /* handle JsonParseException */
+}</code></pre>
+</figure>
+
+<p>While not brilliantly elegant it is possible to express the composition of these two methods while using checked exceptions. Let&rsquo;s push our example further. What if we need to read a list of filenames from disk and parse each as an entity. Using Java 8+ we would model this as a map operation over a stream:</p>
+
+<figure class="code">
+  <figcaption><b>stream</b><span>java</span></figcaption>
+  <pre><code data-lang="java">streamOfFiles.map(this::readFile).map(this::parseEntity)</code></pre>
+</figure>
+
+<p>This example will not compile because the map operation can not handle methods which throw checked exceptions. This is revealed if we look at (a simplified) type signature of the map method:</p>
+
+<figure class="code">
+  <figcaption><b>Stream.map</b><span>java &middot; simplified</span></figcaption>
+  <pre><code data-lang="java">Stream&lt;?&gt; map(Function&lt;?, ?&gt; mapper)</code></pre>
+</figure>
+
+<p>By adding the failure scenario to the call signature of the method we have hampered our ability to reuse this method as a building block for bigger more complex behaviors.</p>
+
+<h2>The solution</h2>
+
+<p>One way we could resolve this problem is by converting our methods to throw unchecked exceptions. This way we can pass around our method by reference to other methods who could invoke them without any complaints from the compiler. By removing the failure scenario from our type signature we made the compiler can no longer aid users of this API in explicitly handling the possibility of failure.</p>
+
+<p>What if, instead of relying on specialized syntax and semantics of checked exceptions, we could communicate the failure scenario as part of the standard signature. We could achieve this by returning a container value from our function representing <em>either</em> an error or a value:</p>
+
+<figure class="code">
+  <figcaption><b>readFile</b><span>java</span></figcaption>
+  <pre><code data-lang="java">Either&lt;Exception, String&gt; readFile(String filename)</code></pre>
+</figure>
+
+<p>The compiler can use this value to guide the user of our API to explicitly handle the scenario of failure.</p>
+
+<p>By adding a <code>map</code> and <code>flatMap</code> operation on this container type we can compose other methods that either return a <em>value</em> or a new <em>container</em> over the value part of the Either container. Using these operations we can write our earlier composition of a single file as follows:</p>
+
+<figure class="code">
+  <figcaption><b>composition</b><span>java</span></figcaption>
+  <pre><code data-lang="java">readFile("entity.json").flatMap(this::parseEntity)</code></pre>
+</figure>
+
+<p>The example of parsing multiple files can also be expressed using our <em>either</em> container value. It requires us to apply <code>flatMap</code> on the <em>either</em> values that are entries in our list:</p>
+
+<figure class="code">
+  <figcaption><b>stream</b><span>java</span></figcaption>
+  <pre><code data-lang="java">streamOfFiles
+  .map(this::readFile)
+  .map(either -&gt; either.flatMap(this::parseEntity))</code></pre>
+</figure>
+
+<p>The <code>map</code> and <code>flatMap</code> operation on the Either container only invoke if the target container contains a value. So if readFile fails, parseEntity will not be invoked and the <code>IOException</code> of readFile will bubble up the stream.</p>
+
+<p>As a result of representing failure scenarios as common values instead of relying on specialized semantics. We can write combinators (i.e. methods that only operate on their input) encapsulating common behavior we want to express when dealing with failure scenarios.</p>
+
+<p>For example we could write a method unwrapping the message from our failure scenario:</p>
+
+<figure class="code">
+  <figcaption><b>excToString</b><span>java</span></figcaption>
+  <pre><code data-lang="java">&lt;R&gt; Either&lt;String, R&gt; excToString(Either&lt;Exception, R&gt; either) {
+  return either.mapLeft(Throwable::getMessage);
+}</code></pre>
+</figure>
+
+<p>Or we could write a combinator that returns the first <code>Either</code> if it contains a value. But if it encapsulates a failure we return the second <code>Either</code>:</p>
+
+<figure class="code">
+  <figcaption><b>alternative</b><span>java</span></figcaption>
+  <pre><code data-lang="java">&lt;L, R&gt; Either&lt;L, R&gt; alternative(Either&lt;L, R&gt; first, Either&lt;L, R&gt; second) {
+  return first.fold(l -&gt; second, Either::right);
+}</code></pre>
+</figure>
+
+<p>This relies on the <code>Either.fold</code> method, which folds the left side or the the right side of the disjunction. Its API looks something like this:</p>
+
+<figure class="code">
+  <figcaption><b>Either.fold</b><span>java</span></figcaption>
+  <pre><code data-lang="java">&lt;L, R, U&gt; U fold(Function&lt;L, U&gt; leftMapper, Function&lt;R, U&gt; rightMapper)</code></pre>
+</figure>
+
+<p>We can use this combinator to use a fallback value value if our file <code>entity_X.json</code> doesn&rsquo;t exist:</p>
+
+<figure class="code">
+  <figcaption><b>fallback</b><span>java</span></figcaption>
+  <pre><code data-lang="java">alternative(readFile("entity_X.json"), readFile("default_entity.json"));</code></pre>
+</figure>
+
+<div class="callout">
+  <p><span class="tag">Note on laziness.</span> Beware that arguments passed to alternative are not interpreted lazily, thus this expression will try to load both files where only 1 will be used.</p>
+</div>
+
+<h2>Conclusion</h2>
+
+<p>Similar to making functions first class citizens, making failure scenarios first class citizens allows you to write code abstracting over these concerns and combine them into new behaviors. Type-safe explicit failure scenarios supply you with both the benefits of checked exceptions, i.e. making failure scenarios explicit for the user, while granting you the composability of methods throwing unchecked exceptions. To start programming using the Either type you can use <a href="https://vavr.io/" rel="noreferrer noopener">VAVR collections library</a> which contains Either alongside many other useful collection and container types inspired by functional programming. If you are triggered by the ideas in this post and want to learn more I can recommend the talk &ldquo;<a href="https://fsharpforfunandprofit.com/rop/" rel="noreferrer noopener">Railway Oriented Progamming</a>&rdquo;.</p>

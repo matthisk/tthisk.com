@@ -1,0 +1,213 @@
+<p class="lede">I have been using Dokku for years to host personal sites and pet projects on a cheap web-server. Dokku allows you to deploy your projects through git-ops. The experience is very similar to deploying to other git-ops platforms like Heroku. This had been working smoothly for my previous personal blog which was a Wordpress app. When I decided to switch my personal site to Ghost I wasn&rsquo;t willing to sacrifice my Dokku setup. This made me figure out how to deploy a Ghost application to Dokku.</p>
+
+<p>The main difference between my Wordpress setup and Ghost, is that there is no code repository managed by Git for my Ghost setup. Since Dokku is based on git-ops there is no clear way to deploy Ghost to a Dokku environment.</p>
+
+<p>Fortunately Dokku allows you to directly deploy Docker images directly, be it a bit of an obscure feature, it works remarkably well. Directly deploying a Docker image gives us the advantage of not having to create a custom code repository for our Ghost deployment, saving us time spent on maintenance.</p>
+
+<ol>
+  <li>Basic setup</li>
+  <li>Mysql</li>
+  <li>NGINX cache</li>
+</ol>
+
+<h2>Basic Setup</h2>
+
+<p><em>Prerequisites:</em> I assume you have a server running Dokku, if you don&rsquo;t it is quite easy to spin one up on <a href="https://marketplace.digitalocean.com/apps/dokku">Digitalocean</a>. This guide is tested against Dokku <em>v0.14.6</em></p>
+
+<p>Start by creating a new Dokku application</p>
+
+<figure class="code">
+  <figcaption><b>create app</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ dokku apps:create my-ghost-app</code></pre>
+</figure>
+
+<p>Once you have an application setup you can pull in the latest Ghost docker image</p>
+
+<figure class="code">
+  <figcaption><b>pull image</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ docker pull ghost:latest</code></pre>
+</figure>
+
+<p>For Dokku to recognize a docker image from your local repository it should be named <code>dokku/name-of-app:tag</code>. So let&rsquo;s tag our Docker image with the correct name:</p>
+
+<figure class="code">
+  <figcaption><b>tag image</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ docker tag ghost:latest dokku/my-ghost-app:latest</code></pre>
+</figure>
+
+<p>Now that we have tagged the Docker image we can deploy it:</p>
+
+<figure class="code">
+  <figcaption><b>deploy</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ dokku tags:deploy my-ghost-app latest</code></pre>
+</figure>
+
+<p>We should now have a docker container that is running Ghost (you can check by issuing the command <code>docker ps</code>). But before we can reach our Ghost application from the outside world we need to expose its port:</p>
+
+<figure class="code">
+  <figcaption><b>expose port</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ dokku proxy:ports-add my-ghost-app http:80:2368</code></pre>
+</figure>
+
+<p>This command tells Dokku to route all incoming traffic on port 80 to port 2368 inside our Ghost Docker container.</p>
+
+<p>Since Docker containers are ephemeral and do not persist across restarts we should mount a storage volume to make sure we do not lose any content when that happens.</p>
+
+<figure class="code">
+  <figcaption><b>mount storage</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ dokku storage:mount my-ghost-app /opt/my-ghost-app/ghost/content:/var/lib/ghost/content</code></pre>
+</figure>
+
+<p>And create the directory.</p>
+
+<figure class="code">
+  <figcaption><b>mkdir</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ mkdir -p /opt/my-ghost-app/ghost/content</code></pre>
+</figure>
+
+<p>Now configure one of Ghost&rsquo;s <a href="https://ghost.org/docs/concepts/config/">environment variables</a> to instruct it for which Host it can receive traffic:</p>
+
+<figure class="code">
+  <figcaption><b>set url</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ dokku config:set my-ghost-app url=http://my-ghost-app.com</code></pre>
+</figure>
+
+<p>Since this domain is not known by the Nginx server operated by Dokku we need to add it through the Dokku command-line:</p>
+
+<figure class="code">
+  <figcaption><b>add domain</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ dokku domains:add my-ghost-app my-ghost-app.com</code></pre>
+</figure>
+
+<p>This should be enough for your blog to be running. Now you can <a href="https://ghost.org/tutorials/">start using</a> your Ghost deployment. Or you could leverage any of the other Dokku features to for instance improve your <a href="https://github.com/dokku/dokku-letsencrypt">deployment&rsquo;s security</a>.</p>
+
+<p><strong>Bonus: uploading large files</strong></p>
+
+<p>By default the Nginx proxy created by Dokku will not allow you to upload &lsquo;large files&rsquo;. We can update the Nginx configuration to support these files. To do this we need to access the server running Dokku with ssh, and create the following file:</p>
+
+<figure class="code">
+  <figcaption><b>upload.conf</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ echo 'client_max_body_size 50M;' &gt; /home/dokku/APP_NAME/nginx.conf.d/upload.conf</code></pre>
+</figure>
+
+<p>Where you replace <code>APP_NAME</code> with the name of your Ghost Dokku app. After this we need to reload the Nginx service and we should be good to go:</p>
+
+<figure class="code">
+  <figcaption><b>reload nginx</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ service nginx reload</code></pre>
+</figure>
+
+<div class="callout">
+  <p><span class="tag">Troubleshooting.</span> In the case something is wrong you can troubleshoot by looking at the Docker container logs, through <code>$ dokku logs my-ghost-app</code>. If this gives you zero output please check that the Ghost docker image is actually running <code>$ docker ps</code>.</p>
+</div>
+
+<h2>Mysql</h2>
+
+<p>By default Ghost will persist all content to a sqlite database. This setup requires very little effort to get up and running but will not outperform a persistence layer backed by Mysql.</p>
+
+<p>Start by creating a new database:</p>
+
+<figure class="code">
+  <figcaption><b>create database</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ dokku mysql:create my-ghost-db</code></pre>
+</figure>
+
+<p>Now link this database to your app. This will populate the <code>DATABASE_URL</code> env variable:</p>
+
+<figure class="code">
+  <figcaption><b>link database</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ dokku mysql:link my-ghost-db my-ghost-app</code></pre>
+</figure>
+
+<p>Finally you need to pass the <code>database__connection</code> environment variable to Ghost. (replace <code>mysql://...</code> with the url printed out by the previous command)</p>
+
+<figure class="code">
+  <figcaption><b>configure ghost</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ dokku config:set my-ghost-app \
+   database__client=mysql \
+   database__connection=mysql://...</code></pre>
+</figure>
+
+<p>That&rsquo;s it. After restarting, your Ghost is running on a Mysql datastore instead of Sqlite.</p>
+
+<h2>NGINX cache</h2>
+
+<p>If you are running Ghost for your personal blog, chances are most posts won&rsquo;t update that frequently. So it is probably a good idea to let nginx cache the output generated by Ghost, this will reduce load on the NodeJS instance(s) in charge of rendering. Unfortunately Ghost sends the following <code>Cache-Control</code> header <code>public, max-age: 0</code> which disallows Nginx to cache html output (by default).</p>
+
+<p>To solve this we will need to deploy Ghost with a custom nginx configuration, instructing Ghost to cache any public content.</p>
+
+<figure class="code">
+  <figcaption><b>new repository</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ git init</code></pre>
+</figure>
+
+<p>Add the following <code>Dockerfile</code> to this new repository:</p>
+
+<figure class="code">
+  <figcaption><b>Dockerfile</b><span>docker</span></figcaption>
+  <pre><code data-lang="docker">FROM ghost:3.1.1
+
+ADD nginx.conf.sigil .</code></pre>
+</figure>
+
+<p>Now get the base <a href="https://github.com/dokku/dokku/blob/master/plugins/nginx-vhosts/templates/nginx.conf.sigil">nginx config template</a> from the Dokku repository. Be sure to pick the configuration template for the version of Dokku that is running on your server.</p>
+
+<p>We first need to instruct NGINX where it can store cached content on the file system. To do this add the following line above the first <code>server</code> block. This line should appear once, top-level in the nginx config:</p>
+
+<figure class="code">
+  <figcaption><b>nginx.conf.sigil</b><span>nginx</span></figcaption>
+  <pre><code data-lang="nginx">proxy_cache_path /tmp/ghost_cache levels=1:2 keys_zone=ghost_cache:10m max_size=500m inactive=24;</code></pre>
+</figure>
+
+<p>Now we can activate the cache for the <code>location</code> block <code>/</code>:</p>
+
+<figure class="code">
+  <figcaption><b>nginx.conf.sigil</b><span>these options enable caching for a location</span></figcaption>
+  <pre><code data-lang="nginx"># Ignore the cache-control header sent by Ghost
+proxy_ignore_headers Cache-Control;
+# Add header for cache status (miss or hit). This allows you to debug whether the cache is working.
+add_header X-Cache-Status $upstream_cache_status;
+
+proxy_cache ghost_cache;
+# Default TTL: 1 day
+proxy_cache_valid 1d;
+# Cache 404 pages for 1h
+proxy_cache_valid 404 1h;
+# use conditional GET requests to refresh the content from origin servers
+proxy_cache_revalidate on;
+proxy_buffering on;
+# Allows starting a background subrequest to update an expired cache item,
+# while a stale cached response is returned to the client.
+proxy_cache_background_update on;
+# Bypass cache for errors
+proxy_cache_use_stale error timeout invalid_header updating http_500 http_502 http_503 http_504;</code></pre>
+</figure>
+
+<p>This will enable caching for all locations, we probably do not want to cache the admin pages, these can be disabled by adding the following block nested inside the root location block:</p>
+
+<figure class="code">
+  <figcaption><b>nginx.conf.sigil</b><span>disables caching for the Ghost admin pages</span></figcaption>
+  <pre><code data-lang="nginx">location /ghost {
+  proxy_pass  http://{{ $.APP }}-{{ $upstream_port }};
+  proxy_cache off;
+}</code></pre>
+</figure>
+
+<p>If you support both HTTP and HTTPS (which you should), be sure to duplicate the process for the HTTPS part of the configuration.</p>
+
+<p>Add all the files to your git repository and create a commit. Now add <code>my-ghost-app</code> as a remote to your git repository:</p>
+
+<figure class="code">
+  <figcaption><b>add remote</b><span>bash</span></figcaption>
+  <pre><code data-lang="bash">$ git remote add dokku dokku@yoursite.com:my-ghost-app</code></pre>
+</figure>
+
+<p>Finally push up your changes to the remote. Dokku&rsquo;s git-ops should take care of rolling out your application.</p>
+
+<p>As a reference I have uploaded my setup to Github (notice that this NGINX config template is written for Dokku 0.14): <a href="https://github.com/matthisk/matthisk.com">https://github.com/matthisk/matthisk.com</a></p>
+
+<h2>References</h2>
+
+<ul>
+  <li><a href="https://www.nginx.com/blog/nginx-caching-guide/">https://www.nginx.com/blog/nginx-caching-guide/</a></li>
+</ul>
