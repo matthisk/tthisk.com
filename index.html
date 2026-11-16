@@ -392,6 +392,7 @@
   }
   .detached.on { display: block; }
   .sudo .err { color: var(--red); }
+  .input { color: var(--bright); white-space: pre-wrap; }
 
   /* ---- theme switch, bottom-right of the page ---- */
   .theme {
@@ -658,8 +659,8 @@
               <pre class="cow" id="cow" title="moo" role="button" tabindex="0" aria-label="A cow saying a random quote. Activate for another one."></pre>
             </div>
           </div>
-          <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
-          <p class="hint t-only">keys: <kbd>0</kbd>-<kbd>3</kbd> windows &middot; <kbd>ctrl</kbd>+<kbd>b</kbd> <kbd>?</kbd> help</p>
+          <p class="line prompt"><span class="ps1"><b>visitor@tthisk</b>:<em>~</em>$ </span><span class="input"></span><span class="cursor"></span></p>
+          <p class="hint t-only">keys: <kbd>0</kbd>-<kbd>3</kbd> windows &middot; <kbd>ctrl</kbd>+<kbd>b</kbd> <kbd>?</kbd> help &middot; or type <kbd>help</kbd></p>
         </div>
       </div>
     </section>
@@ -681,7 +682,7 @@
           </div>
         </div>
         <ul class="posts p-only" id="post-list"></ul>
-        <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
+        <p class="line prompt"><span class="ps1"><b>visitor@tthisk</b>:<em>~</em>$ </span><span class="input"></span><span class="cursor"></span></p>
       </div>
       <div id="blog-post" hidden></div>
     </section>
@@ -697,7 +698,7 @@
           <div class="sum" id="tree-sum"></div>
         </div>
       </div>
-      <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
+      <p class="line prompt"><span class="ps1"><b>visitor@tthisk</b>:<em>~</em>$ </span><span class="input"></span><span class="cursor"></span></p>
     </section>
 
     <!-- 3: about -->
@@ -723,7 +724,7 @@
       <dl class="kv p-only" id="facts"></dl>
       <h3 class="p-only">Career</h3>
       <ul class="p-only" id="career"></ul>
-      <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
+      <p class="line prompt"><span class="ps1"><b>visitor@tthisk</b>:<em>~</em>$ </span><span class="input"></span><span class="cursor"></span></p>
     </section>
 
   </main>
@@ -753,6 +754,7 @@
       <dt>q, Esc</dt><dd>close post or popup</dd>
       <dt>C-b d</dt><dd>detach (you can come back)</dd>
       <dt>C-b v</dt><dd>view the plain version</dd>
+      <dt>help &#9166;</dt><dd>commands you can type at the prompt</dd>
     </dl>
     <p class="x">There may be other things worth typing.</p>
   </div>
@@ -954,6 +956,7 @@
     postReq++; // drop any post still loading
     if (i === cur && !postOpen) return;
     token++; // stop any typing in progress
+    resetLine();
     if (cur >= 0) {
       // make sure the window we leave is complete if we come back without animation
       wins[cur].querySelectorAll(".cmd").forEach(function (c) { c.textContent = c.dataset.cmd; });
@@ -1000,6 +1003,7 @@
   function renderPost(n, p, html, err, keepHash) {
     if (cur !== 1) show(1, true);
     token++;
+    resetLine();
     postOpen = true;
     document.body.classList.add("reading");
     var el = $("blog-post");
@@ -1184,25 +1188,143 @@
     sudoLine("cat blog/.drafts.md", ["cat: blog/.drafts.md: Permission denied"]);
   });
 
-  // ---- easter egg 2: typing "sudo" anywhere ----
-  function sudoLine(cmd, lines) {
+  // ---- visitor output: a command and its result, added above the live prompt ----
+  // err: true marks the last line as an error, a number marks only lines from that index on
+  function sudoLine(cmd, lines, err) {
     var root = postOpen ? $("blog-post") : (cur === 1 ? $("blog-list") : wins[cur]);
-    var cursors = root.querySelectorAll(".line > .ps1 + .cursor");
-    var last = cursors.length ? cursors[cursors.length - 1].parentNode : null;
+    var prompt = root.querySelector(".prompt");
+    var from = err === undefined || err === true ? lines.length - 1 : err === false ? lines.length : err;
     var div = document.createElement("div");
     div.className = "block sudo";
-    div.innerHTML = '<p class="line"><span class="ps1"><b>visitor@tthisk</b>:<em>~</em>$ </span><span class="cmd">' + esc(cmd) + "</span></p>" +
-      '<div class="out">' + lines.map(function (l, i) {
-        return '<p class="line' + (i === lines.length - 1 ? " err" : "") + '">' + esc(l) + "</p>";
-      }).join("") + "</div>";
-    if (last) last.before(div); else root.appendChild(div);
-    div.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+    div.innerHTML = '<p class="line"><span class="ps1"><b>visitor@tthisk</b>:<em>~</em>$ </span><span class="cmd" data-cmd="' + esc(cmd) + '">' + esc(cmd) + "</span></p>" +
+      (lines.length ? '<div class="out">' + lines.map(function (l, i) {
+        return '<p class="line' + (i >= from ? " err" : "") + '">' + esc(l) + "</p>";
+      }).join("") + "</div>" : "");
+    if (prompt) prompt.before(div); else root.appendChild(div);
+    (prompt || div).scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
   }
-  function sudo() {
-    sudoLine("sudo", [
-      "[sudo] password for visitor: ********",
-      "visitor is not in the sudoers file. This incident will be reported."
-    ]);
+  var SUDO = [
+    "[sudo] password for visitor: ********",
+    "visitor is not in the sudoers file. This incident will be reported."
+  ];
+  // easter egg: typing "sudo" while reading a post (where there is no prompt)
+  function sudo() { sudoLine("sudo", SUDO); }
+
+  // ---- the prompt: a small shell for whatever the visitor types ----
+  var cmdLine = "";
+  function promptEl() { return !postOpen && cur >= 0 ? wins[cur].querySelector(".prompt") : null; }
+  function setLine(s) {
+    token++; // typing at the prompt finishes any typing animation at once
+    cmdLine = s;
+    var p = promptEl(); if (!p) return;
+    p.querySelector(".input").textContent = s;
+    p.scrollIntoView({ block: "nearest" });
+  }
+  function resetLine() {
+    cmdLine = "";
+    document.querySelectorAll(".prompt .input").forEach(function (n) { n.textContent = ""; });
+  }
+  // a command naming the window we're already in just shows its top again
+  function go(w) {
+    if (w === cur && !postOpen) { screen.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" }); return []; }
+    show(w); return null;
+  }
+  function clearOutput() {
+    var root = cur === 1 ? $("blog-list") : wins[cur];
+    root.querySelectorAll(".block.sudo").forEach(function (b) { b.remove(); });
+  }
+  // "blog", "blog/", "~/blog", "./blog/" all name the blog window
+  function winOf(arg) {
+    var a = String(arg || "~").replace(/^~\/?|^\.\/|\/$/g, "");
+    if (a === "" || a === "home" || a === "..") return 0;
+    return NAMES.indexOf(a);
+  }
+  function postOf(arg) {
+    var a = String(arg || "").replace(/^(~\/)?(blog\/)?/, "").replace(/\.md$/, "");
+    for (var i = 0; i < POSTS.length; i++) if (String(POSTS[i].slug).replace(/\.md$/, "") === a || String(i) === a) return i;
+    return -1;
+  }
+  var COMMANDS = {
+    help: function () {
+      return [
+        "help            this list",
+        "ls [dir]        list a directory",
+        "cd <dir>        go to ~, blog, projects or about",
+        "cat <file>      cat about.txt",
+        "less <post>     read a post by slug or number, e.g. less 0",
+        "fortune         a random fortune",
+        "whoami, pwd, date, echo, clear, exit",
+        " ",
+        "keys: 0-3 windows (on an empty line), C-b ? key help, C-l clear"
+      ];
+    },
+    ls: function (args) {
+      var flags = args.filter(function (a) { return a[0] === "-"; }).join("");
+      var dir = args.filter(function (a) { return a[0] !== "-"; })[0];
+      var w = winOf(dir);
+      if (dir === undefined || w === 0) return [(/a/.test(flags) ? ".config/  " : "") + "about.txt  blog/  projects/"];
+      if (w === 1) {
+        if (/a/.test(flags) && !$("ls").classList.contains("all")) $("la").click();
+        return go(1);
+      }
+      if (w === 2) return go(2);
+      if (/^(\.\/)?about\.txt$/.test(dir)) return ["about.txt"];
+      return { err: ["ls: cannot access '" + dir + "': No such file or directory"] };
+    },
+    cd: function (args) {
+      var w = winOf(args[0]);
+      if (w < 0) return { err: ["cd: " + args[0] + ": No such file or directory"] };
+      return go(w);
+    },
+    tree: function (args) { return COMMANDS.cd(args.length ? args.filter(function (a) { return a[0] !== "-" && !/^\d+$/.test(a); }) : ["projects"]); },
+    cat: function (args) {
+      var f = args[0];
+      if (!f) return { err: ["cat: missing file operand"] };
+      if (/^(~\/)?(about\.txt|\.config\/me\.toml)$/.test(f)) return go(3);
+      if (/\.drafts\.md$/.test(f)) return { err: ["cat: " + f + ": Permission denied"] };
+      if (postOf(f) >= 0) return COMMANDS.less(args);
+      if (winOf(f) >= 0) return { err: ["cat: " + f + ": Is a directory"] };
+      return { err: ["cat: " + f + ": No such file or directory"] };
+    },
+    less: function (args) {
+      if (!args[0]) return { err: ["Missing filename (\"less --help\" for help)"] };
+      var n = postOf(args[0]);
+      if (n < 0) return { err: [args[0] + ": No such file or directory"] };
+      openPost(n); return null;
+    },
+    fortune: function () { return [FORTUNES[Math.floor(Math.random() * FORTUNES.length)]]; },
+    whoami: function () { return ["visitor"]; },
+    pwd: function () { return [cur === 0 ? "/home/m" : "/home/m/" + NAMES[cur]]; },
+    date: function () { return [new Date().toString()]; },
+    echo: function (args) { return [args.join(" ")]; },
+    clear: function () { clearOutput(); return null; },
+    exit: function () { detach(); return null; },
+    sudo: function () { return { err: SUDO, from: 1 }; }
+  };
+  COMMANDS.more = COMMANDS.less; COMMANDS.logout = COMMANDS.exit; COMMANDS["?"] = COMMANDS.help;
+
+  function run(input) {
+    var args = input.trim().split(/\s+/).filter(Boolean), name = args.shift();
+    if (!name) { sudoLine("", []); return; }
+    var fn = Object.prototype.hasOwnProperty.call(COMMANDS, name) ? COMMANDS[name] : null;
+    var out = fn ? fn(args) : { err: ["bash: " + name + ": command not found"] };
+    if (out === null) return; // the command changed the screen instead of printing
+    if (Array.isArray(out)) sudoLine(input, out, false);
+    else sudoLine(input, out.err, out.from === undefined ? 0 : out.from);
+  }
+
+  // returns true when the key went to the prompt
+  function promptKey(e) {
+    var k = e.key;
+    if (!promptEl() || !help.hidden) return false;
+    if (k === "Enter") { var s = cmdLine; setLine(""); run(s); return true; }
+    if (k === "Backspace") { setLine(cmdLine.slice(0, -1)); return true; }
+    if (k === "Escape") { if (!cmdLine) return false; setLine(""); return true; }
+    if (k.length !== 1) return false;
+    if (/^[0-3]$/.test(k) && !cmdLine) return false; // window switch on an empty line
+    if (k === " " && !cmdLine) return true;
+    setLine((cmdLine + k).slice(0, 200));
+    return true;
   }
 
   // ---- help + detach ----
@@ -1224,10 +1346,14 @@
     if (isPlain()) return; // a plain page has no key bindings
     if ($("detached").classList.contains("on")) { if (!e.metaKey) { e.preventDefault(); attach(); } return; }
     if (e.ctrlKey && (e.key === "b" || e.key === "B")) { e.preventDefault(); setPrefix(true); return; }
+    if (e.ctrlKey && (e.key === "l" || e.key === "L") && promptEl()) { e.preventDefault(); clearOutput(); return; }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     var t = e.target;
     if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
     var k = e.key;
+    // Enter/space on a focused link or button should still activate it, unless a line is being typed
+    var onControl = t && t.closest && t.closest("a, button, [role=button]");
+    if (!prefix && !(onControl && !cmdLine && (k === "Enter" || k === " ")) && promptKey(e)) { e.preventDefault(); return; }
     if (prefix) {
       if (k === "Shift") return;
       setPrefix(false); e.preventDefault();

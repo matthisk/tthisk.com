@@ -8,6 +8,7 @@ The look is a terminal window running a tmux session, in the Tokyo Night palette
 
 - Keys: `0-3` switch windows, `Ctrl-b n/p` next/previous, `Ctrl-b ?` help, `Ctrl-b d` detach. Inside a post: `space`/`b` page, `g`/`G` ends, `q` quit.
 - Easter eggs: a clickable `fortune | cowsay`, `sudo`, `ls -la` (shows `.dotfiles/` and `.drafts.md`).
+- The last prompt line in each window (`.prompt`) is a small shell: typed keys echo there, `Enter` runs one of `COMMANDS` in `index.html` (`help` lists them), and output is added above the prompt by `sudoLine()`. Digits switch windows only while the line is empty. Commands that name a window or post (`cd`, `ls`, `cat`, `less`) switch to it rather than print. There is no prompt inside a post, so the key bindings above apply there.
 
 ### Plain look
 
