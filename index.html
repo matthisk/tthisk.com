@@ -487,16 +487,13 @@
   .reading #w-blog { border: 0; margin: 0; padding: 0; }
 
   /* home */
-  .avatar { float: right; width: 9em; margin: .3em 0 1em 1.5em; image-rendering: pixelated; border: 1px solid var(--rule); }
+  .avatar { display: block; box-sizing: border-box; width: 100%; margin: .5em 0 0; image-rendering: pixelated; border: 1px solid var(--rule); }
   .kv { display: grid; grid-template-columns: max-content 1fr; gap: .1em 1.2em; margin: 0 0 1em; }
   .kv dt { font-weight: bold; text-transform: capitalize; }
   .kv dd { margin: 0; }
-  #w-home h3 { clear: both; }
   .recent li { margin: .25em 0; }
   .recent time { color: var(--muted); }
   .recent time::after { content: " \2014  "; }
-  .cow { cursor: pointer; line-height: 1.2; }
-  @media (max-width: 600px) { .avatar { float: none; display: block; margin: 0 0 1em; } }
 
   /* blog */
   .posts li { margin: 0 0 .9em; }
@@ -574,13 +571,20 @@
     var root = document.documentElement, meta = document.querySelector('meta[name="color-scheme"]');
     try {
       if (localStorage.getItem("theme") === "light") { root.setAttribute("data-theme", "light"); meta.content = "light"; }
-      if (localStorage.getItem("style") === "plain") {
-        root.setAttribute("data-style", "plain");
-        document.getElementById("css-term").media = "not all";
-        document.getElementById("css-plain").media = "all";
-        meta.content = "light dark";
-      }
     } catch (e) {}
+    // the look comes from ?style=plain; a URL without it falls back to the last
+    // choice, which is then written into the URL so history stays truthful
+    var q = new URLSearchParams(location.search).get("style"), plain = q === "plain";
+    if (q === null) {
+      try { plain = localStorage.getItem("style") === "plain"; } catch (e) {}
+      if (plain) { var u = new URL(location.href); u.searchParams.set("style", "plain"); history.replaceState(null, "", u); }
+    }
+    if (plain) {
+      root.setAttribute("data-style", "plain");
+      document.getElementById("css-term").media = "not all";
+      document.getElementById("css-plain").media = "all";
+      meta.content = "light dark";
+    }
   })();
 </script>
 </head>
@@ -604,12 +608,6 @@
     <section class="win" id="w-home" data-win="0" aria-label="Home">
       <div class="split">
         <div class="pane">
-          <div class="block">
-            <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd" id="avatar-cmd">chafa img/pixel-profile-2.jpeg</span></p>
-            <div class="out">
-              <img class="avatar" id="avatar-img" src="img/pixel-profile-2.jpeg" alt="Dithered profile picture">
-            </div>
-          </div>
           <div class="block">
             <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">fetch</span></p>
             <div class="out">
@@ -638,6 +636,12 @@
               </div>
             </div>
           </div>
+          <div class="block">
+            <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd" id="avatar-cmd">chafa img/pixel-profile-2.jpeg</span></p>
+            <div class="out">
+              <img class="avatar" id="avatar-img" src="img/pixel-profile-2.jpeg" alt="Dithered profile picture">
+            </div>
+          </div>
         </div>
 
         <div class="pane">
@@ -648,9 +652,8 @@
               <ul class="recent" id="recent"></ul>
             </div>
           </div>
-          <div class="block">
+          <div class="block t-only">
             <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">fortune | cowsay</span></p>
-            <h3 class="p-only">Fortune</h3>
             <div class="out">
               <pre class="cow" id="cow" title="moo" role="button" tabindex="0" aria-label="A cow saying a random quote. Activate for another one."></pre>
             </div>
@@ -763,7 +766,7 @@
 
 <footer class="site-foot p-only">
   <hr>
-  <p>Best viewed in a terminal. <button type="button" id="to-term">View the terminal version</button>.</p>
+  <p><button type="button" id="to-term">View the terminal version</button>.</p>
 </footer>
 
 <button type="button" class="theme" id="theme" role="switch" aria-checked="false" aria-label="Light mode" title="Toggle light mode">
@@ -1126,7 +1129,10 @@
     var a = e.target.closest && e.target.closest('a[href^="#blog/"]');
     if (a) { e.preventDefault(); openPost(+a.getAttribute("href").split("/")[1]); }
   });
-  window.addEventListener("popstate", route);
+  window.addEventListener("popstate", function () {
+    if (styleFromUrl() !== isPlain()) setStyle(!isPlain(), true); // Back/Forward across a look switch
+    route();
+  });
   window.addEventListener("hashchange", route);
 
   // ---- easter egg 1: fortune | cowsay ----
@@ -1273,7 +1279,10 @@
 
   // ---- terminal / plain look ----
   function isPlain() { return document.documentElement.getAttribute("data-style") === "plain"; }
-  function setStyle(plain) {
+  function styleFromUrl() { return new URLSearchParams(location.search).get("style") === "plain"; }
+  // fromHistory: the URL already says which look (popstate), so don't push a new entry
+  function setStyle(plain, fromHistory) {
+    if (plain === isPlain()) return;
     var root = document.documentElement;
     if (plain) root.setAttribute("data-style", "plain"); else root.removeAttribute("data-style");
     $("css-term").media = plain ? "not all" : "all";
@@ -1281,6 +1290,11 @@
     document.querySelector('meta[name="color-scheme"]').content =
       plain ? "light dark" : root.getAttribute("data-theme") === "light" ? "light" : "dark";
     try { localStorage.setItem("style", plain ? "plain" : "terminal"); } catch (e) {}
+    if (!fromHistory) {
+      var u = new URL(location.href);
+      if (plain) u.searchParams.set("style", "plain"); else u.searchParams.delete("style");
+      history.pushState(null, "", u.pathname + u.search + u.hash);
+    }
     token++; // stop any typing; typeIn puts the full text back
     toggleHelp(false); setPrefix(false);
     if (plain) { if (postOpen) window.scrollTo(0, 0); else jumpTo(cur); }
