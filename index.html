@@ -17,15 +17,13 @@
   output of a command. All the text comes from content.json (and posts/*.html),
   loaded at startup, so the page needs JavaScript and an HTTP server.
 -->
-<script>
-  document.documentElement.className = "js";
-  // theme before first paint: dark unless the visitor picked light earlier
-  try { if (localStorage.getItem("theme") === "light") {
-    document.documentElement.setAttribute("data-theme", "light");
-    document.querySelector('meta[name="color-scheme"]').content = "light";
-  } } catch (e) {}
-</script>
-<style>
+<script>document.documentElement.className = "js";</script>
+<!--
+  Two looks, one markup. #css-term is the tmux terminal; #css-plain is the
+  "no stylesheet" early-web look. Exactly one is active: the other has
+  media="not all". .t-only / .p-only mark markup that belongs to one look.
+-->
+<style id="css-term">
   :root {
     --page: #111219;
     --bg: #1a1b26;
@@ -447,9 +445,152 @@
     .cursor { animation: none; }
     body, .term, .theme .knob { transition: none; }
   }
+  .p-only { display: none !important; }
 </style>
+<style id="css-plain" media="not all">
+  /* The page as a browser shows it without a stylesheet (serif text, blue
+     underlined links, rules between sections), plus just enough to read well. */
+  :root { --ink: #111; --muted: #595959; --rule: #a0a0a0; --paper: #fff; --code: #f2f2f2; --link: #0000ee; --visited: #551a8b; --active: #e00; --mark: #fff3a8; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink: #dcdcdc; --muted: #9a9a9a; --rule: #555; --paper: #1c1c1c; --code: #282828; --link: #8ab4f8; --visited: #c58af9; --active: #ff8a8a; --mark: #4a4320; }
+  }
+  html { background: var(--paper); color: var(--ink); }
+  body {
+    max-width: 40em; margin: 0 auto; padding: 1em 16px 3em;
+    font: 18px/1.6 Georgia, "Times New Roman", Times, serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  a { color: var(--link); text-underline-offset: 2px; }
+  a:visited { color: var(--visited); }
+  a:active { color: var(--active); }
+  button { font: inherit; color: var(--link); background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
+  h1 { font-size: 2em; line-height: 1.2; margin: .4em 0 .3em; }
+  h2 { font-size: 1.5em; line-height: 1.25; margin: 0 0 .6em; }
+  h3 { font-size: 1.17em; margin: 1.6em 0 .5em; }
+  hr { border: 0; border-top: 1px solid var(--rule); margin: 1.5em 0; }
+  img { max-width: 100%; height: auto; }
+  pre, code, kbd, samp { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  pre, kbd { font-size: .8em; }
+  :not(pre) > code { font-size: .88em; background: var(--code); padding: .05em .25em; }
+  pre { overflow-x: auto; line-height: 1.45; }
+  ul, ol { padding-left: 1.6em; }
+  .when, .meta { color: var(--muted); }
+
+  /* sections stacked on one page; the rule between them stands in for <hr> */
+  .win + .win { border-top: 1px solid var(--rule); margin-top: 2.5em; padding-top: 1.5em; }
+  .site-head nav { font-size: .95em; }
+  .site-foot { color: var(--muted); font-size: .85em; }
+  .site-foot button { color: var(--link); }
+
+  /* reading a post: it becomes the page */
+  .reading .win:not(#w-blog), .reading #w-blog > h2 { display: none; }
+  .reading #w-blog { border: 0; margin: 0; padding: 0; }
+
+  /* home */
+  .avatar { float: right; width: 9em; margin: .3em 0 1em 1.5em; image-rendering: pixelated; border: 1px solid var(--rule); }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: .1em 1.2em; margin: 0 0 1em; }
+  .kv dt { font-weight: bold; text-transform: capitalize; }
+  .kv dd { margin: 0; }
+  #w-home h3 { clear: both; }
+  .recent li { margin: .25em 0; }
+  .recent time { color: var(--muted); }
+  .recent time::after { content: " \2014  "; }
+  .cow { cursor: pointer; line-height: 1.2; }
+  @media (max-width: 600px) { .avatar { float: none; display: block; margin: 0 0 1em; } }
+
+  /* blog */
+  .posts li { margin: 0 0 .9em; }
+
+  /* projects */
+  .tree .grp { margin-bottom: 2em; }
+  .tree .grp > .blu { display: block; font-size: 1.17em; font-weight: bold; }
+  .tree .note { display: block; font-style: italic; color: var(--muted); }
+  .tree .grp > .body > .node { display: list-item; list-style: disc; margin: 1em 0 0 1.5em; }
+  .tree .node > a, .tree .dir { font-weight: bold; }
+  .tree .tag { color: var(--muted); font-size: .85em; }
+  .tree .tag::before { content: " ("; }
+  .tree .tag::after { content: ")"; }
+  .tree .node .body p { margin: .3em 0 .6em; }
+  .tree pre { background: var(--code); padding: .6em .8em; }
+
+  /* blog post */
+  .post .meta { font-style: italic; margin: 0 0 1.5em; }
+  .post h1 { font-size: 1.8em; }
+  .post h2 { font-size: 1.4em; margin: 1.8em 0 .6em; }
+  .post h3 { font-size: 1.15em; }
+  .post .lede { font-size: 1.1em; }
+  .post blockquote { margin: 1.5em 2em; font-style: italic; }
+  .post blockquote cite { font-style: normal; color: var(--muted); }
+  .post .callout { border: 1px solid var(--rule); padding: .6em 1em; margin: 1.5em 0; }
+  .post .callout .tag { font-weight: bold; }
+  .post .callout p:last-child { margin-bottom: 0; }
+  .post figure { margin: 1.5em 0; }
+  .post figure.code { border: 1px solid var(--rule); background: var(--code); }
+  .post figure.code figcaption {
+    display: flex; justify-content: space-between; gap: 1em;
+    padding: .3em .8em; border-bottom: 1px solid var(--rule);
+    font: .75em ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--muted);
+  }
+  .post figure.code pre { margin: 0; padding: .7em .8em; }
+  .post .l { display: block; } /* the highlighter puts each line in its own span */
+  .post .l.hl { background: var(--mark); }
+  .post .tk-c { color: var(--muted); font-style: italic; }
+  .post .tk-pr { user-select: none; }
+  .post .frame { overflow-x: auto; }
+  .post .ascii { white-space: pre; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .8em; line-height: 1.3; }
+  .post figure.fig figcaption { color: var(--muted); font-size: .85em; text-align: center; margin-top: .6em; }
+  .post figure.img img { display: block; margin: 0 auto; }
+  .post figure.img.small img { width: 100%; max-width: 540px; }
+  @media (prefers-color-scheme: dark) { .post figure.img img { filter: invert(.86); } }
+  .post .series .here { font-weight: bold; }
+  .post .series .here::after { content: " (this post)"; font-weight: normal; color: var(--muted); }
+  .post .tbl { overflow-x: auto; margin: 1.5em 0; }
+  .post table { border-collapse: collapse; }
+  .post th, .post td { border: 1px solid var(--rule); padding: .25em .6em; text-align: left; vertical-align: top; }
+  .post th.num, .post td.num { text-align: right; }
+  .post sup { line-height: 0; }
+  .post .notes { border-top: 1px solid var(--rule); margin-top: 3em; padding-top: 1em; font-size: .9em; }
+
+  /* svg diagrams: plain ink instead of the palette */
+  .dg { display: block; width: 100%; min-width: 620px; height: auto; }
+  .dg text { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14px; fill: currentColor; }
+  .dg .box { fill: var(--paper); stroke: currentColor; }
+  .dg .hot, .dg .wire.a { stroke: var(--link); }
+  .dg .dash { stroke-dasharray: 5 4; }
+  .dg .hd { font-weight: bold; }
+  .dg .lbl { fill: var(--muted); font-size: 12.5px; }
+  .dg .sep { stroke: var(--rule); }
+  .dg .wire { stroke: currentColor; fill: none; stroke-width: 1.3; }
+  .dg .ah { fill: currentColor; }
+  .dg .ah.a, .dg .ac, .dg .dot { fill: var(--link); }
+
+  /* terminal-only chrome */
+  .t-only, .titlebar, .status, .popup, .detached, .theme, .pager,
+  .line:has(> .ps1), .logo, .swatch, .kv .hi, .kv .sep, .tree > .blu, .tree .br, .tree .sum { display: none !important; }
+</style>
+<script>
+  // pick the look and colour theme before first paint
+  (function () {
+    var root = document.documentElement, meta = document.querySelector('meta[name="color-scheme"]');
+    try {
+      if (localStorage.getItem("theme") === "light") { root.setAttribute("data-theme", "light"); meta.content = "light"; }
+      if (localStorage.getItem("style") === "plain") {
+        root.setAttribute("data-style", "plain");
+        document.getElementById("css-term").media = "not all";
+        document.getElementById("css-plain").media = "all";
+        meta.content = "light dark";
+      }
+    } catch (e) {}
+  })();
+</script>
 </head>
 <body>
+
+<header class="site-head p-only">
+  <h1>tthisk.com</h1>
+  <nav aria-label="Sections" id="plain-nav">[ <a href="#">Home</a> | <a href="#blog">Blog</a> | <a href="#projects">Projects</a> | <a href="#about">About</a> ]</nav>
+  <hr>
+</header>
 
 <div class="term" id="term">
   <div class="titlebar" aria-hidden="true">
@@ -491,8 +632,9 @@
               </div>
               <div class="intro">
                 <p id="intro"></p>
-                <p class="dim">This is a terminal-flavoured home page. Use the status line at the bottom
-                to move between windows, or press <kbd>0</kbd>&ndash;<kbd>3</kbd>.</p>
+                <p class="dim t-only">This is a terminal-flavoured home page. Use the status line at the bottom
+                to move between windows, or press <kbd>0</kbd>&ndash;<kbd>3</kbd>.
+                Prefer something quieter? Try the <button class="flag" id="to-plain" type="button">plain version</button>.</p>
               </div>
             </div>
           </div>
@@ -500,6 +642,7 @@
 
         <div class="pane">
           <div class="block">
+            <h3 class="p-only">Recent posts</h3>
             <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">ls -t blog/ | head -3</span></p>
             <div class="out">
               <ul class="recent" id="recent"></ul>
@@ -507,20 +650,22 @@
           </div>
           <div class="block">
             <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">fortune | cowsay</span></p>
+            <h3 class="p-only">Fortune</h3>
             <div class="out">
               <pre class="cow" id="cow" title="moo" role="button" tabindex="0" aria-label="A cow saying a random quote. Activate for another one."></pre>
             </div>
           </div>
           <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
-          <p class="hint">keys: <kbd>0</kbd>-<kbd>3</kbd> windows &middot; <kbd>ctrl</kbd>+<kbd>b</kbd> <kbd>?</kbd> help</p>
+          <p class="hint t-only">keys: <kbd>0</kbd>-<kbd>3</kbd> windows &middot; <kbd>ctrl</kbd>+<kbd>b</kbd> <kbd>?</kbd> help</p>
         </div>
       </div>
     </section>
 
     <!-- 1: blog -->
     <section class="win" id="w-blog" data-win="1" aria-label="Blog">
+      <h2 class="p-only">Blog</h2>
       <div id="blog-list">
-        <div class="block">
+        <div class="block t-only">
           <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd" id="ls-cmd">ls -lt blog/</span></p>
           <div class="out">
             <div class="ls" id="ls">
@@ -532,6 +677,7 @@
             <p class="dim" style="margin-top:1.2em"><span id="post-count"></span>. Older ones live in <a href="#">archive/</a>. Feeling nosy? Try <button class="flag" id="la" type="button">ls -la</button>.</p>
           </div>
         </div>
+        <ul class="posts p-only" id="post-list"></ul>
         <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
       </div>
       <div id="blog-post" hidden></div>
@@ -539,6 +685,7 @@
 
     <!-- 2: projects -->
     <section class="win" id="w-projects" data-win="2" aria-label="Projects">
+      <h2 class="p-only">Projects</h2>
       <div class="block">
         <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">tree -L 2 projects/</span></p>
         <div class="out tree">
@@ -552,22 +699,27 @@
 
     <!-- 3: about -->
     <section class="win" id="w-about" data-win="3" aria-label="About">
+      <h2 class="p-only">About</h2>
       <div class="block">
         <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">cat about.txt</span></p>
         <div class="out prose" id="about-text"></div>
       </div>
-      <div class="block">
+      <div class="block t-only">
         <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">cat ~/.config/me.toml</span></p>
         <div class="out">
 <pre class="toml" id="toml"></pre>
         </div>
       </div>
-      <div class="block">
+      <div class="block t-only">
         <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cmd">git log --oneline -5 -- career/</span></p>
         <div class="out">
 <pre class="log" id="log"></pre>
         </div>
       </div>
+      <h3 class="p-only">Details</h3>
+      <dl class="kv p-only" id="facts"></dl>
+      <h3 class="p-only">Career</h3>
+      <ul class="p-only" id="career"></ul>
       <p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span><span class="cursor"></span></p>
     </section>
 
@@ -597,6 +749,7 @@
       <dt>C-b ?</dt><dd>this list</dd>
       <dt>q, Esc</dt><dd>close post or popup</dd>
       <dt>C-b d</dt><dd>detach (you can come back)</dd>
+      <dt>C-b v</dt><dd>view the plain version</dd>
     </dl>
     <p class="x">There may be other things worth typing.</p>
   </div>
@@ -607,6 +760,11 @@
     <p class="dim" style="margin-top:1.4em">press any key to reattach</p>
   </div>
 </div>
+
+<footer class="site-foot p-only">
+  <hr>
+  <p>Best viewed in a terminal. <button type="button" id="to-term">View the terminal version</button>.</p>
+</footer>
 
 <button type="button" class="theme" id="theme" role="switch" aria-checked="false" aria-label="Light mode" title="Toggle light mode">
   <span class="knob" aria-hidden="true">
@@ -631,6 +789,7 @@
     if (Math.abs(new Date() - d) > 182 * 864e5) return String(d.getFullYear());
     return MONTHS[d.getMonth()] + " " + String(d.getDate()).padStart(2, "0");
   }
+  function longDate(s) { return parseDate(s).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }); }
   function link(text, href) { return '<a href="' + esc(href || "#") + '">' + esc(text) + "</a>"; }
   function postLink(p, text) { return '<a href="#blog/' + p.index + '">' + esc(text) + "</a>"; }
 
@@ -665,6 +824,10 @@
         '<span class="date">' + esc(lsDate(p.date)) + "</span>" + postLink(p, p.slug) +
         '<span class="d">' + (p.description ? "# " + esc(p.description) : "") + "</span></div>";
     }).join(""));
+    $("post-list").innerHTML = newest.map(function (p) {
+      return "<li>" + postLink(p, p.title) + ' <span class="when">(' + esc(longDate(p.date)) + ")</span>" +
+        (p.description ? "<br>" + esc(p.description) : "") + "</li>";
+    }).join("");
     $("post-count").textContent = POSTS.length + (POSTS.length === 1 ? " post" : " posts");
 
     // projects: tree
@@ -674,11 +837,13 @@
       var items = g.items || [];
       dirs += items.length;
       return '<div class="node grp' + (gi === groups.length - 1 ? " last" : "") + '">' + branch(gi === groups.length - 1) +
-        '<span class="blu">' + esc(g.name) + "/</span>" + (g.note ? '<span class="note"># ' + esc(g.note) + "</span>" : "") +
+        '<span class="blu">' + esc(g.name) + '<span class="t-only">/</span></span>' +
+        (g.note ? '<span class="note"><span class="t-only"># </span>' + esc(g.note) + "</span>" : "") +
         '<div class="body">' + items.map(function (it, i) {
           var last = i === items.length - 1, ex = it.example;
           return '<div class="node' + (last ? " last" : "") + '">' + branch(last) +
-            (it.href ? link(it.name + "/", it.href) : '<span class="dir">' + esc(it.name) + "/</span>") +
+            (it.href ? '<a href="' + esc(it.href) + '">' + esc(it.name) + '<span class="t-only">/</span></a>'
+              : '<span class="dir">' + esc(it.name) + '<span class="t-only">/</span></span>') +
             (it.tag ? '<span class="tag">' + esc(it.tag) + "</span>" : "") +
             '<div class="body">' + [].concat(it.text || []).map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") +
             (ex ? '<pre aria-label="' + esc(ex.label || "") + '"><span class="dim">$</span> ' + esc(ex.command || "") + "\n" +
@@ -709,6 +874,17 @@
       var d = l.date || "";
       return '<span class="sha">' + esc(l.sha) + "</span> " + '<span class="date">' + esc(d) + " ".repeat(dw - d.length) + "</span> " + (l.ref ? '<span class="ref">(' + esc(l.ref) + ")</span> " : "") + esc(l.message);
     }).join("\n");
+    // plain look: the same config and log as a definition list and a list
+    $("facts").innerHTML = Object.keys(cfg).map(function (s) {
+      return Object.keys(cfg[s]).map(function (k) {
+        return "<dt>" + esc(k) + "</dt><dd>" + [].concat(cfg[s][k]).map(function (v) {
+          return v && typeof v === "object" ? link(v.text, v.href) : esc(v);
+        }).join(", ") + "</dd>";
+      }).join("");
+    }).join("");
+    $("career").innerHTML = logs.map(function (l) {
+      return "<li>" + esc(l.message) + ' <span class="when">(' + esc(l.date || "") + ")</span></li>";
+    }).join("");
   }
 
   function esc(s) {
@@ -736,7 +912,7 @@
   async function typeIn(root) {
     var my = ++token;
     var blocks = Array.prototype.filter.call(root.querySelectorAll(".block"), function (b) { return b.offsetParent !== null; });
-    if (reduce) return;
+    if (reduce || isPlain()) return;
     blocks.forEach(function (b) {
       var c = b.querySelector(".cmd"), o = b.querySelector(".out");
       if (c) c.textContent = "";
@@ -828,12 +1004,13 @@
       [].concat(p.summary || []).map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") +
       '<p class="dim">' + esc(err || "[placeholder: the full post goes here]") + "</p>";
     var tpl = html !== null;
-    el.innerHTML =
+    var back = '<p class="p-only"><a href="#blog">&larr; All posts</a></p>';
+    el.innerHTML = back +
       '<div class="block"><p class="line"><span class="ps1"><b>m@tthisk</b>:<em>~</em>$ </span>' +
       '<span class="cmd" data-cmd="less blog/' + esc(p.slug) + '">less blog/' + esc(p.slug) + '</span></p>' +
       '<div class="out post' + (tpl ? " long" : "") + '"><h1>' + esc(p.title) + '</h1>' +
       '<div class="meta">' + esc(p.date) + ' &middot; ' + esc(p.read) + ' read</div>' +
-      body + '</div></div>' +
+      body + '</div></div>' + back +
       '<button type="button" class="pager" id="post-q"><span>blog/' + esc(p.slug) + '</span>' +
       '<span class="pct" id="post-pct">0%</span><span class="keys">space/b page &middot; g/G ends &middot; q quit</span></button>';
     el.querySelectorAll("pre code[data-lang]").forEach(highlight);
@@ -841,6 +1018,7 @@
     updatePager();
     $("post-q").addEventListener("click", function () { closePost(); setHash("blog"); });
     screen.scrollTop = 0;
+    if (isPlain()) window.scrollTo(0, 0);
     if (!keepHash) setHash("blog/" + n);
     typeIn(el);
   }
@@ -931,9 +1109,17 @@
     var m = /^blog\/(\d+)$/.exec(h);
     if (m) { openPost(+m[1], true); return; }
     var i = NAMES.indexOf(h);
+    if (isPlain()) { show(i < 0 ? 0 : i, true); jumpTo(i < 0 ? 0 : i); return; }
     if (postOpen && i === 1) { closePost(); return; }
     show(i < 0 ? 0 : i, true);
   }
+
+  // plain look: every window is on the page at once, so "showing" one means scrolling to it
+  function jumpTo(i) { if (i === 0) window.scrollTo(0, 0); else wins[i].scrollIntoView(); }
+  $("plain-nav").addEventListener("click", function (e) {
+    var a = e.target.closest("a"); if (!a) return;
+    e.preventDefault(); setHash(a.getAttribute("href").slice(1)); route();
+  });
 
   tabs.forEach(function (t) { t.addEventListener("click", function () { show(+t.dataset.go); }); });
   document.addEventListener("click", function (e) {
@@ -1029,6 +1215,7 @@
   }
 
   document.addEventListener("keydown", function (e) {
+    if (isPlain()) return; // a plain page has no key bindings
     if ($("detached").classList.contains("on")) { if (!e.metaKey) { e.preventDefault(); attach(); } return; }
     if (e.ctrlKey && (e.key === "b" || e.key === "B")) { e.preventDefault(); setPrefix(true); return; }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1043,6 +1230,7 @@
       else if (/^[0-3]$/.test(k)) show(+k);
       else if (k === "?") toggleHelp();
       else if (k === "d") detach();
+      else if (k === "v") setStyle(true);
       return;
     }
     if (k === "Escape" || k === "q") {
@@ -1082,6 +1270,24 @@
   }
   setTheme(document.documentElement.getAttribute("data-theme") === "light", false);
   themeBtn.addEventListener("click", function () { setTheme(themeBtn.getAttribute("aria-checked") !== "true", true); });
+
+  // ---- terminal / plain look ----
+  function isPlain() { return document.documentElement.getAttribute("data-style") === "plain"; }
+  function setStyle(plain) {
+    var root = document.documentElement;
+    if (plain) root.setAttribute("data-style", "plain"); else root.removeAttribute("data-style");
+    $("css-term").media = plain ? "not all" : "all";
+    $("css-plain").media = plain ? "all" : "not all";
+    document.querySelector('meta[name="color-scheme"]').content =
+      plain ? "light dark" : root.getAttribute("data-theme") === "light" ? "light" : "dark";
+    try { localStorage.setItem("style", plain ? "plain" : "terminal"); } catch (e) {}
+    token++; // stop any typing; typeIn puts the full text back
+    toggleHelp(false); setPrefix(false);
+    if (plain) { if (postOpen) window.scrollTo(0, 0); else jumpTo(cur); }
+    else { window.scrollTo(0, 0); screen.scrollTop = 0; updatePager(); }
+  }
+  $("to-plain").addEventListener("click", function () { setStyle(true); });
+  $("to-term").addEventListener("click", function () { setStyle(false); });
 
   // ---- status line clock ----
   function tick() {

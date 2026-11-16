@@ -9,6 +9,15 @@ The look is a terminal window running a tmux session, in the Tokyo Night palette
 - Keys: `0-3` switch windows, `Ctrl-b n/p` next/previous, `Ctrl-b ?` help, `Ctrl-b d` detach. Inside a post: `space`/`b` page, `g`/`G` ends, `q` quit.
 - Easter eggs: a clickable `fortune | cowsay`, `sudo`, `ls -la` (shows `.dotfiles/` and `.drafts.md`).
 
+### Plain look
+
+A second look is the one deliberate exception to the terminal metaphor: the page as a browser shows it without a stylesheet (serif text, blue underlined links, rules between sections), with a little added to make it readable, and a soft dark variant that follows `prefers-color-scheme`. All sections are stacked on one page, posts replace the page, and there are no key bindings or typing animation. You can switch to it from the home intro, with `Ctrl-b v`, or with the footer link in the plain look. The choice is saved as `localStorage.style` (`plain` / `terminal`), separately from the light/dark `theme`.
+
+- The two looks are two `<style>` blocks in `index.html`, `#css-term` and `#css-plain`. Exactly one is active; the other has `media="not all"`. `setStyle()` switches them, and an early script in `<head>` picks one before first paint.
+- Mark markup that belongs to only one look with `.t-only` or `.p-only`. Command lines (`.line` holding a `.ps1`) are hidden automatically in the plain look; give a section a `<h2 class="p-only">`/`<h3 class="p-only">` heading instead.
+- When terminal output doesn't read well as plain text (the `ls` grid, the TOML, the git log), `render()` also fills a simple `.p-only` list from the same `content.json` data. New content needs both.
+- New post markup needs rules in both stylesheets. The plain one must at least keep `.post .l { display: block; }` (the highlighter puts code lines in spans) and give `.dg` SVGs a fill and stroke.
+
 ## Layout
 
 `index.html` holds the CSS, markup and one inline `<script>`. The site's text lives in `content.json`; `render()` reads it at startup and fills empty containers in the markup. Commands, prompts, key help and easter eggs are UI chrome and stay in `index.html`. Full post bodies are HTML fragments in `posts/`, with images in `img/`.
