@@ -1,0 +1,14 @@
+.git
+.direnv
+.envrc
+.gitignore
+.assetsignore
+.DS_Store
+.claude
+.wrangler
+flake.nix
+flake.lock
+AGENTS.md
+CLAUDE.md
+projects.md
+wrangler.jsonc

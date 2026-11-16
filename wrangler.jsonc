@@ -1,0 +1,10 @@
+{
+  "name": "tthisk-com",
+  "compatibility_date": "2026-11-16",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "."
+  }
+}
